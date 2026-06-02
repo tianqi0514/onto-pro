@@ -58,7 +58,7 @@ nav {
   gap: 8px;
 }
 
-nav a {
+.nav-item {
   min-height: 42px;
   display: flex;
   align-items: center;
@@ -66,10 +66,14 @@ nav a {
   color: #b9c7d0;
   padding: 0 12px;
   border-radius: 8px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
 }
 
-nav a.active,
-nav a:hover {
+.nav-item.active,
+.nav-item:hover {
   background: #26343d;
   color: #ffffff;
 }
@@ -230,13 +234,17 @@ h2 {
 
 .project-list,
 .scenario-list,
-.simulation-list {
+.simulation-list,
+.ontology-list,
+.field-list,
+.task-list {
   display: grid;
   gap: 8px;
 }
 
 .project-row,
-.scenario {
+.scenario,
+.task-list button {
   width: 100%;
   border: 1px solid #dbe3e8;
   background: #f8fafb;
@@ -254,7 +262,8 @@ h2 {
 }
 
 .project-row.selected,
-.scenario.selected {
+.scenario.selected,
+.task-list button:hover {
   border-color: #0f766e;
   background: #ecfdf9;
 }
@@ -349,6 +358,15 @@ td {
   overflow-wrap: anywhere;
 }
 
+tbody tr {
+  cursor: pointer;
+}
+
+tbody tr:hover,
+.selected-row {
+  background: #f1fbf8;
+}
+
 .rule-list,
 .trace,
 .evidence-list,
@@ -365,7 +383,9 @@ td {
 }
 
 .rule,
-.simulation {
+.simulation,
+.ontology-item,
+.suite {
   border: 1px solid #e0e7eb;
   border-radius: 8px;
   padding: 10px;
@@ -373,6 +393,58 @@ td {
   justify-content: space-between;
   gap: 12px;
   align-items: center;
+}
+
+.simulation {
+  width: 100%;
+  background: #ffffff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.simulation:hover {
+  border-color: #0f766e;
+  background: #f7fbfa;
+}
+
+.ontology-item,
+.suite,
+.rule.stacked {
+  display: grid;
+  align-items: start;
+  justify-content: stretch;
+}
+
+.ontology-item .badge,
+.suite .badge {
+  width: fit-content;
+}
+
+.rule.stacked em {
+  width: fit-content;
+}
+
+.field-list {
+  margin-top: 14px;
+}
+
+.field-list label,
+.eval-result label {
+  border: 1px solid #e0e7eb;
+  border-radius: 8px;
+  padding: 10px;
+  background: #fbfcfd;
+}
+
+.context-line {
+  color: #60717d;
+  line-height: 1.5;
+  margin: 12px 0 0;
+  font-size: 13px;
+}
+
+.spaced {
+  margin-top: 12px;
 }
 
 .run-detail p {
