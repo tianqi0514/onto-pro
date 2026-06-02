@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="760" viewBox="0 0 1100 760">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2E74B5"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="1100" height="760" fill="#FFFFFF"/>
+  <text x="48" y="56" font-size="30" font-weight="700" fill="#1F4D78" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">本体解析分层与失真观测点</text>
+<rect x="60" y="92" width="980" height="58" rx="7" fill="#F7FAFC" stroke="#BFC8D2" stroke-width="1.2"/>
+<text x="88" y="129" font-size="22" font-weight="700" fill="#1F4D78" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">L0 文档层</text>
+<text x="288" y="129" font-size="19" font-weight="400" fill="#1B2733" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">文件类型、来源、阶段、页码、上传位置</text>
+<line x1="550" y1="153" x2="550" y2="170" stroke="#A4B4C4" stroke-width="1.8" marker-end="url(#arrow)"/>
+<rect x="60" y="170" width="980" height="58" rx="7" fill="#EEF5FB" stroke="#BFC8D2" stroke-width="1.2"/>
+<text x="88" y="207" font-size="22" font-weight="700" fill="#1F4D78" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">L1 实体字段层</text>
+<text x="288" y="207" font-size="19" font-weight="400" fill="#1B2733" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">项目、主体、金额、日期、合同编号、坐落</text>
+<line x1="550" y1="231" x2="550" y2="248" stroke="#A4B4C4" stroke-width="1.8" marker-end="url(#arrow)"/>
+<rect x="60" y="248" width="980" height="58" rx="7" fill="#E8F1F8" stroke="#BFC8D2" stroke-width="1.2"/>
+<text x="88" y="285" font-size="22" font-weight="700" fill="#1F4D78" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">L2 关系层</text>
+<text x="288" y="285" font-size="19" font-weight="400" fill="#1B2733" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">项目-主体、合同-抵押物、应收账款-买卖方</text>
+<line x1="550" y1="309" x2="550" y2="326" stroke="#A4B4C4" stroke-width="1.8" marker-end="url(#arrow)"/>
+<rect x="60" y="326" width="980" height="58" rx="7" fill="#E1ECF5" stroke="#BFC8D2" stroke-width="1.2"/>
+<text x="88" y="363" font-size="22" font-weight="700" fill="#1F4D78" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">L3 状态层</text>
+<text x="288" y="363" font-size="19" font-weight="400" fill="#1B2733" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">立项、审批、签署、登记、放款、逾期</text>
+<line x1="550" y1="387" x2="550" y2="404" stroke="#A4B4C4" stroke-width="1.8" marker-end="url(#arrow)"/>
+<rect x="60" y="404" width="980" height="58" rx="7" fill="#F4F6F9" stroke="#BFC8D2" stroke-width="1.2"/>
+<text x="88" y="441" font-size="22" font-weight="700" fill="#1F4D78" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">L4 规则层</text>
+<text x="288" y="441" font-size="19" font-weight="400" fill="#1B2733" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">风控、合规、额度、放款前置、合同条款</text>
+<line x1="550" y1="465" x2="550" y2="482" stroke="#A4B4C4" stroke-width="1.8" marker-end="url(#arrow)"/>
+<rect x="60" y="482" width="980" height="58" rx="7" fill="#FFF7E6" stroke="#BFC8D2" stroke-width="1.2"/>
+<text x="88" y="519" font-size="22" font-weight="700" fill="#8A6500" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">L5 跨文档一致性层</text>
+<text x="288" y="519" font-size="19" font-weight="400" fill="#1B2733" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">合同、审批表、评估、票据、账户多源校验</text>
+<line x1="550" y1="543" x2="550" y2="560" stroke="#A4B4C4" stroke-width="1.8" marker-end="url(#arrow)"/>
+<rect x="60" y="560" width="980" height="58" rx="7" fill="#FDECEC" stroke="#BFC8D2" stroke-width="1.2"/>
+<text x="88" y="597" font-size="22" font-weight="700" fill="#9B1C1C" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">L6 事件层</text>
+<text x="288" y="597" font-size="19" font-weight="400" fill="#1B2733" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">诉讼、舆情、查封、回款异常、担保失效</text>
+<line x1="550" y1="621" x2="550" y2="638" stroke="#A4B4C4" stroke-width="1.8" marker-end="url(#arrow)"/>
+<rect x="60" y="638" width="980" height="58" rx="7" fill="#F5EDED" stroke="#BFC8D2" stroke-width="1.2"/>
+<text x="88" y="675" font-size="22" font-weight="700" fill="#9B1C1C" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">L7 决策层</text>
+<text x="288" y="675" font-size="19" font-weight="400" fill="#1B2733" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">风险判断、上会建议、资产分类、处置策略</text>
+<text x="74" y="720" font-size="18" font-weight="600" fill="#5C6670" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">第一阶段目标：L0-L4 稳定，L5 在关键字段可检出冲突，L6-L7 作为边界探索。</text>
+</svg>

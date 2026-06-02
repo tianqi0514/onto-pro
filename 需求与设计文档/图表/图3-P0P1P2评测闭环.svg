@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="620" viewBox="0 0 1160 620">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2E74B5"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="1160" height="620" fill="#FFFFFF"/>
+  <text x="48" y="56" font-size="30" font-weight="700" fill="#1F4D78" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">P0 / P1 / P2 评测闭环</text>
+<rect x="70" y="112" width="310" height="140" rx="8" fill="#EDF7F2" stroke="#B7C4D1" stroke-width="1.2"/>
+<text x="94" y="154" font-size="24" font-weight="700" fill="#1F7A5A" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">P0 最小可用</text>
+<text x="94" y="192" font-size="17" font-weight="400" fill="#1B2733" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial"><tspan x="94" dy="0">结构清晰、规则明确</tspan><tspan x="94" dy="22.950000000000003">验证 L0-L4 基础稳定</tspan></text>
+<line x1="392" y1="182" x2="420" y2="182" stroke="#2E74B5" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="430" y="112" width="310" height="140" rx="8" fill="#EEF5FB" stroke="#B7C4D1" stroke-width="1.2"/>
+<text x="454" y="154" font-size="24" font-weight="700" fill="#1F4D78" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">P1 真实业务</text>
+<text x="454" y="192" font-size="17" font-weight="400" fill="#1B2733" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial"><tspan x="454" dy="0">多文件、多阶段、工具调用</tspan><tspan x="454" dy="22.950000000000003">验证 L4-L5 规则组合</tspan></text>
+<line x1="752" y1="182" x2="780" y2="182" stroke="#2E74B5" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="790" y="112" width="310" height="140" rx="8" fill="#FFF1F0" stroke="#B7C4D1" stroke-width="1.2"/>
+<text x="814" y="154" font-size="24" font-weight="700" fill="#9B1C1C" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">P2 能力边界</text>
+<text x="814" y="192" font-size="17" font-weight="400" fill="#1B2733" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial"><tspan x="814" dy="0">扫描件、冲突证据、事件变化</tspan><tspan x="814" dy="22.950000000000003">观察 L5-L7 失真点</tspan></text>
+<rect x="70" y="350" width="185" height="90" rx="8" fill="#F7FAFC" stroke="#CCD4DC" stroke-width="1.2"/>
+<text x="86" y="384" font-size="18" font-weight="700" fill="#1F4D78" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">构造 EvalCase</text>
+<text x="86" y="415" font-size="13" font-weight="400" fill="#5C6670" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">source_files / expected / boundary_tags</text>
+<line x1="258" y1="395" x2="278" y2="395" stroke="#A4B4C4" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="285" y="350" width="185" height="90" rx="8" fill="#F7FAFC" stroke="#CCD4DC" stroke-width="1.2"/>
+<text x="301" y="384" font-size="18" font-weight="700" fill="#1F4D78" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">运行平台</text>
+<text x="301" y="415" font-size="13" font-weight="400" fill="#5C6670" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">场景匹配、抽取、规则、工具、证据</text>
+<line x1="473" y1="395" x2="493" y2="395" stroke="#A4B4C4" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="500" y="350" width="185" height="90" rx="8" fill="#F7FAFC" stroke="#CCD4DC" stroke-width="1.2"/>
+<text x="516" y="384" font-size="18" font-weight="700" fill="#1F4D78" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">自动评分 + 人工复核</text>
+<text x="516" y="415" font-size="13" font-weight="400" fill="#5C6670" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">对象、关系、规则、结论、证据</text>
+<line x1="688" y1="395" x2="708" y2="395" stroke="#A4B4C4" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="715" y="350" width="185" height="90" rx="8" fill="#F7FAFC" stroke="#CCD4DC" stroke-width="1.2"/>
+<text x="731" y="384" font-size="18" font-weight="700" fill="#1F4D78" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">边界归因</text>
+<text x="731" y="415" font-size="13" font-weight="400" fill="#5C6670" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">判断失真发生在 L0-L7 的哪一层</text>
+<line x1="903" y1="395" x2="923" y2="395" stroke="#A4B4C4" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="930" y="350" width="185" height="90" rx="8" fill="#F7FAFC" stroke="#CCD4DC" stroke-width="1.2"/>
+<text x="946" y="384" font-size="18" font-weight="700" fill="#1F4D78" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">反馈回写</text>
+<text x="946" y="415" font-size="13" font-weight="400" fill="#5C6670" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">候选规则、Skill 修正、回归用例</text>
+<line x1="600" y1="448" x2="600" y2="505" stroke="#A4B4C4" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="320" y="515" width="560" height="62" rx="8" fill="#F4F6F9" stroke="#CCD4DC" stroke-width="1.2"/>
+<text x="348" y="553" font-size="20" font-weight="600" fill="#1B2733" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">回归验证：本体或 Skill 每次变更，都必须跑同一批 EvalCase。</text>
+</svg>

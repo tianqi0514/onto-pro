@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1480" height="650" viewBox="0 0 1480 650">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2E74B5"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="1480" height="650" fill="#FFFFFF"/>
+  <text x="48" y="56" font-size="30" font-weight="700" fill="#1F4D78" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">金融客户场景推理工作流</text>
+<rect x="50" y="120" width="300" height="94" rx="8" fill="#F7FAFC" stroke="#B7C4D1" stroke-width="1.2"/>
+<text x="72" y="154" font-size="22" font-weight="700" fill="#1F4D78" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">输入材料</text>
+<text x="72" y="184" font-size="16" font-weight="400" fill="#5C6670" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial"><tspan x="72" dy="0">DOCX / PDF / XLSX</tspan><tspan x="72" dy="21.6">扫描件 / 系统台账</tspan></text>
+<rect x="406" y="120" width="300" height="94" rx="8" fill="#F7FAFC" stroke="#B7C4D1" stroke-width="1.2"/>
+<text x="428" y="154" font-size="22" font-weight="700" fill="#1F4D78" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">场景识别</text>
+<text x="428" y="184" font-size="16" font-weight="400" fill="#5C6670" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">匹配租赁、保理、合同、放款、上会问答</text>
+<rect x="762" y="120" width="300" height="94" rx="8" fill="#F7FAFC" stroke="#B7C4D1" stroke-width="1.2"/>
+<text x="784" y="154" font-size="22" font-weight="700" fill="#1F4D78" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">加载本体切片</text>
+<text x="784" y="184" font-size="16" font-weight="400" fill="#5C6670" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">对象、关系、状态、规则、指标、事件</text>
+<rect x="1118" y="120" width="300" height="94" rx="8" fill="#F7FAFC" stroke="#B7C4D1" stroke-width="1.2"/>
+<text x="1140" y="154" font-size="22" font-weight="700" fill="#1F4D78" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">调用 Skills</text>
+<text x="1140" y="184" font-size="16" font-weight="400" fill="#5C6670" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">OCR、抽取、计算、比对、外部查询</text>
+<rect x="762" y="310" width="300" height="94" rx="8" fill="#F4F6F9" stroke="#B7C4D1" stroke-width="1.2"/>
+<text x="784" y="344" font-size="22" font-weight="700" fill="#1F4D78" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">规则推理</text>
+<text x="784" y="374" font-size="16" font-weight="400" fill="#5C6670" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial"><tspan x="784" dy="0">原子规则组合</tspan><tspan x="784" dy="21.6">形成结构化轨迹</tspan></text>
+<rect x="406" y="310" width="300" height="94" rx="8" fill="#F4F6F9" stroke="#B7C4D1" stroke-width="1.2"/>
+<text x="428" y="344" font-size="22" font-weight="700" fill="#1F4D78" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">证据归因</text>
+<text x="428" y="374" font-size="16" font-weight="400" fill="#5C6670" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">文件、页码、条款、字段、工具结果</text>
+<rect x="50" y="310" width="300" height="94" rx="8" fill="#F4F6F9" stroke="#B7C4D1" stroke-width="1.2"/>
+<text x="72" y="344" font-size="22" font-weight="700" fill="#1F4D78" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">输出与反馈</text>
+<text x="72" y="374" font-size="16" font-weight="400" fill="#5C6670" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial"><tspan x="72" dy="0">结论、风险、阻断项</tspan><tspan x="72" dy="21.6">反馈回写 EvalCase</tspan></text>
+<line x1="358" y1="167.0" x2="396" y2="167.0" stroke="#2E74B5" stroke-width="2" marker-end="url(#arrow)"/>
+<line x1="714" y1="167.0" x2="752" y2="167.0" stroke="#2E74B5" stroke-width="2" marker-end="url(#arrow)"/>
+<line x1="1070" y1="167.0" x2="1108" y2="167.0" stroke="#2E74B5" stroke-width="2" marker-end="url(#arrow)"/>
+<line x1="1268.0" y1="224" x2="1268.0" y2="298" stroke="#2E74B5" stroke-width="2" marker-end="url(#arrow)"/>
+<line x1="752" y1="357.0" x2="716" y2="357.0" stroke="#2E74B5" stroke-width="2" marker-end="url(#arrow)"/>
+<line x1="396" y1="357.0" x2="360" y2="357.0" stroke="#2E74B5" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="50" y="520" width="1370" height="80" rx="8" fill="#FFF7E6" stroke="#E5C77A" stroke-width="1.2"/>
+<text x="74" y="555" font-size="21" font-weight="600" fill="#8A6500" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">治理闭环：本体版本、Skill 版本、证据源、人工反馈、回归评测、权限审计必须同时记录。</text>
+<text x="74" y="582" font-size="17" font-weight="400" fill="#5C6670" text-anchor="start" font-family="PingFang SC, Microsoft YaHei, Arial">核心不是“自动回答”，而是让每一次回答都能被追溯、被评分、被修正。</text>
+</svg>
