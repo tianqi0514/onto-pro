@@ -33,3 +33,49 @@ def test_eval_run():
     response = client.post("/api/eval/runs", json={"suite_id": "evalsuite.leasing.p0"})
     assert response.status_code == 200
     assert response.json()["total"] >= 1
+
+
+def test_llm_settings_roundtrip():
+    response = client.put(
+        "/api/settings/llm",
+        json={
+            "provider": "openai",
+            "model": "gpt-4.1-mini",
+            "base_url": "https://api.openai.com/v1",
+            "api_key": "sk-test-local",
+            "temperature": 0.2,
+            "enabled": True,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["configured"] is True
+    assert "sk-test-local" not in str(payload)
+
+    test_response = client.post("/api/settings/llm/test")
+    assert test_response.status_code == 200
+    assert test_response.json()["status"] == "ready"
+
+
+def test_rule_test():
+    response = client.post(
+        "/api/rules/rule.collateral_coverage/test",
+        json={"project_id": "project_qsl_001", "rule_id": "rule.collateral_coverage"},
+    )
+    assert response.status_code == 200
+    assert response.json()["result"] == "hit"
+
+
+def test_agent_feedback():
+    response = client.post(
+        "/api/agent/runs/run_project_qsl_001_scenario.leasing_risk_review/feedback",
+        json={
+            "run_id": "run_project_qsl_001_scenario.leasing_risk_review",
+            "project_id": "project_qsl_001",
+            "rating": "correct",
+            "comment": "ok",
+            "save_as_eval_case": True,
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "saved"

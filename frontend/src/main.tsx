@@ -9,10 +9,13 @@ import {
   CheckCircle2,
   FileText,
   GitBranch,
+  KeyRound,
   Layers3,
   Play,
   RefreshCw,
+  Save,
   Search,
+  Settings,
   ShieldCheck,
   SlidersHorizontal
 } from "lucide-react";
@@ -72,6 +75,7 @@ type Rule = {
 
 type AgentRun = {
   run_id: string;
+  llm: { provider: string; model: string; configured: boolean; enabled: boolean };
   matched_scenario: { id: string; name: string; confidence: number };
   skills_called: Array<{ name: string; status: string; mode: string }>;
   rules_applied: Array<{ rule_id: string; rule_name: string; result: string }>;
@@ -138,7 +142,34 @@ type SimulationRun = {
   conclusion: { summary: string; risk_level_after: string; disclaimer: string };
 };
 
-type ActiveSection = "projects" | "documents" | "ontology" | "agent" | "eval" | "simulation";
+type LlmSettings = {
+  provider: string;
+  model: string;
+  base_url: string;
+  temperature: number;
+  enabled: boolean;
+  configured: boolean;
+  api_key_masked: string;
+};
+
+type LlmForm = {
+  provider: string;
+  model: string;
+  base_url: string;
+  temperature: number;
+  enabled: boolean;
+  api_key: string;
+};
+
+type RuleTestResult = {
+  rule_id: string;
+  rule_name: string;
+  result: string;
+  facts: Array<{ name: string; value: string | number }>;
+  evidence: string[];
+};
+
+type ActiveSection = "projects" | "documents" | "ontology" | "agent" | "eval" | "simulation" | "settings";
 
 async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -171,7 +202,8 @@ const navigationItems: Array<{ id: ActiveSection; label: string; icon: typeof La
   { id: "ontology", label: "本体", icon: GitBranch },
   { id: "agent", label: "Agent", icon: Bot },
   { id: "eval", label: "评测", icon: Beaker },
-  { id: "simulation", label: "推演", icon: SlidersHorizontal }
+  { id: "simulation", label: "推演", icon: SlidersHorizontal },
+  { id: "settings", label: "设置", icon: Settings }
 ];
 
 function App() {
@@ -183,6 +215,15 @@ function App() {
   const [simTemplates, setSimTemplates] = useState<SimulationTemplate[]>([]);
   const [objectTypes, setObjectTypes] = useState<ObjectType[]>([]);
   const [relationTypes, setRelationTypes] = useState<RelationType[]>([]);
+  const [llmSettings, setLlmSettings] = useState<LlmSettings | null>(null);
+  const [llmForm, setLlmForm] = useState<LlmForm>({
+    provider: "openai",
+    model: "gpt-4.1-mini",
+    base_url: "https://api.openai.com/v1",
+    temperature: 0.2,
+    enabled: false,
+    api_key: ""
+  });
   const [activeSection, setActiveSection] = useState<ActiveSection>("projects");
   const [selectedProjectId, setSelectedProjectId] = useState("project_qsl_001");
   const [selectedScenarioId, setSelectedScenarioId] = useState("scenario.leasing_risk_review");
@@ -191,6 +232,11 @@ function App() {
   const [evalRun, setEvalRun] = useState<EvalRun | null>(null);
   const [extraction, setExtraction] = useState<Extraction | null>(null);
   const [simulationRun, setSimulationRun] = useState<SimulationRun | null>(null);
+  const [ruleTestResult, setRuleTestResult] = useState<RuleTestResult | null>(null);
+  const [feedbackRating, setFeedbackRating] = useState("correct");
+  const [feedbackComment, setFeedbackComment] = useState("");
+  const [feedbackStatus, setFeedbackStatus] = useState("");
+  const [llmTestMessage, setLlmTestMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
   const selectedProject = useMemo(
@@ -210,14 +256,15 @@ function App() {
 
   useEffect(() => {
     async function load() {
-      const [projectData, scenarioData, ruleData, suiteData, templateData, objectData, relationData] = await Promise.all([
+      const [projectData, scenarioData, ruleData, suiteData, templateData, objectData, relationData, llmData] = await Promise.all([
         api<Project[]>("/api/projects"),
         api<Scenario[]>("/api/scenarios"),
         api<Rule[]>("/api/rules"),
         api<EvalSuite[]>("/api/eval/suites"),
         api<SimulationTemplate[]>("/api/simulations/templates"),
         api<ObjectType[]>("/api/ontology/object-types"),
-        api<RelationType[]>("/api/ontology/relation-types")
+        api<RelationType[]>("/api/ontology/relation-types"),
+        api<LlmSettings>("/api/settings/llm")
       ]);
       setProjects(projectData);
       setScenarios(scenarioData);
@@ -226,6 +273,15 @@ function App() {
       setSimTemplates(templateData);
       setObjectTypes(objectData);
       setRelationTypes(relationData);
+      setLlmSettings(llmData);
+      setLlmForm({
+        provider: llmData.provider,
+        model: llmData.model,
+        base_url: llmData.base_url,
+        temperature: llmData.temperature,
+        enabled: llmData.enabled,
+        api_key: ""
+      });
     }
     load().catch(console.error);
   }, []);
@@ -256,6 +312,40 @@ function App() {
         body: JSON.stringify({ project_id: selectedProjectId, task_id: selectedScenarioId })
       });
       setAgentRun(result);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveFeedback(saveAsEvalCase = false) {
+    if (!agentRun) return;
+    setLoading(true);
+    try {
+      const result = await api<{ status: string }> (`/api/agent/runs/${agentRun.run_id}/feedback`, {
+        method: "POST",
+        body: JSON.stringify({
+          run_id: agentRun.run_id,
+          project_id: selectedProjectId,
+          rating: feedbackRating,
+          comment: feedbackComment,
+          save_as_eval_case: saveAsEvalCase
+        })
+      });
+      setFeedbackStatus(result.status === "saved" ? "反馈已保存" : "已提交");
+      setFeedbackComment("");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function testRule(ruleId: string) {
+    setLoading(true);
+    try {
+      const result = await api<RuleTestResult>(`/api/rules/${ruleId}/test`, {
+        method: "POST",
+        body: JSON.stringify({ project_id: selectedProjectId, rule_id: ruleId })
+      });
+      setRuleTestResult(result);
     } finally {
       setLoading(false);
     }
@@ -304,6 +394,33 @@ function App() {
     }
   }
 
+  async function saveLlmSettings() {
+    setLoading(true);
+    try {
+      const result = await api<LlmSettings>("/api/settings/llm", {
+        method: "PUT",
+        body: JSON.stringify(llmForm)
+      });
+      setLlmSettings(result);
+      setLlmForm((current) => ({ ...current, api_key: "" }));
+      setLlmTestMessage("LLM 配置已保存");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function testLlmSettings() {
+    setLoading(true);
+    try {
+      const result = await api<{ status: string; message: string }>("/api/settings/llm/test", {
+        method: "POST"
+      });
+      setLlmTestMessage(result.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <main className="shell">
       <aside className="sidebar">
@@ -339,9 +456,9 @@ function App() {
             <h1>金融客户样板工作台</h1>
           </div>
           <div className="toolbar">
-            <span className="mode-pill" title="当前数据来自本地样例和 mock API，正式数据库、对象存储和外部查询接口后续接入。">
-              本地样例
-            </span>
+            <button className="mode-pill" onClick={() => setActiveSection("settings")} title="进入设置中心配置 LLM Key">
+              {llmSettings?.configured ? `${llmSettings.provider} / ${llmSettings.model}` : "配置 LLM"}
+            </button>
             <button className="icon-button" title="刷新" onClick={() => window.location.reload()}>
               <RefreshCw size={18} />
             </button>
@@ -543,9 +660,19 @@ function App() {
                       <span>{rule.name}</span>
                       <small>{rule.definition}</small>
                       <em className={badgeClass(rule.mock_result)}>{rule.mock_result}</em>
+                      <button className="mini-button" onClick={() => testRule(rule.id)} disabled={loading}>测试规则</button>
                     </div>
                   ))}
                 </div>
+                {ruleTestResult && (
+                  <div className="result-box">
+                    <strong>{ruleTestResult.rule_name}</strong>
+                    <span className={badgeClass(ruleTestResult.result)}>{ruleTestResult.result}</span>
+                    {ruleTestResult.facts.map((fact) => (
+                      <label key={fact.name}>{fact.name}<span>{fact.value}</span></label>
+                    ))}
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -601,6 +728,30 @@ function App() {
                       {agentRun.evidence.map((item) => (
                         <label key={item.source}>{item.source}<span>{item.excerpt_or_value}</span></label>
                       ))}
+                    </div>
+                    <div className="feedback-box">
+                      <strong>人工反馈</strong>
+                      <div className="segmented">
+                        {["correct", "needs_fix", "evidence_error"].map((rating) => (
+                          <button
+                            className={feedbackRating === rating ? "active" : ""}
+                            key={rating}
+                            onClick={() => setFeedbackRating(rating)}
+                          >
+                            {rating === "correct" ? "正确" : rating === "needs_fix" ? "需修正" : "证据错误"}
+                          </button>
+                        ))}
+                      </div>
+                      <textarea
+                        value={feedbackComment}
+                        onChange={(event) => setFeedbackComment(event.target.value)}
+                        placeholder="记录业务专家反馈、遗漏事实或证据问题"
+                      />
+                      <div className="button-row">
+                        <button className="secondary-button" onClick={() => saveFeedback(false)} disabled={loading}>保存反馈</button>
+                        <button className="secondary-button" onClick={() => saveFeedback(true)} disabled={loading}>保存为评测</button>
+                      </div>
+                      {feedbackStatus && <span className="subtle-meta">{feedbackStatus}</span>}
                     </div>
                   </div>
                 ) : (
@@ -719,6 +870,102 @@ function App() {
                     <span>选择一个模板运行推演</span>
                   </div>
                 )}
+              </div>
+            </>
+          )}
+
+          {activeSection === "settings" && (
+            <>
+              <div className="panel">
+                <div className="panel-title">
+                  <h2>LLM 配置</h2>
+                  <KeyRound size={18} />
+                </div>
+                <div className="settings-form">
+                  <label>
+                    Provider
+                    <select
+                      value={llmForm.provider}
+                      onChange={(event) => setLlmForm((current) => ({ ...current, provider: event.target.value }))}
+                    >
+                      <option value="openai">OpenAI</option>
+                      <option value="azure_openai">Azure OpenAI</option>
+                      <option value="local">Local / Compatible</option>
+                    </select>
+                  </label>
+                  <label>
+                    Model
+                    <input
+                      value={llmForm.model}
+                      onChange={(event) => setLlmForm((current) => ({ ...current, model: event.target.value }))}
+                      placeholder="gpt-4.1-mini"
+                    />
+                  </label>
+                  <label>
+                    Base URL
+                    <input
+                      value={llmForm.base_url}
+                      onChange={(event) => setLlmForm((current) => ({ ...current, base_url: event.target.value }))}
+                      placeholder="https://api.openai.com/v1"
+                    />
+                  </label>
+                  <label>
+                    API Key
+                    <input
+                      type="password"
+                      value={llmForm.api_key}
+                      onChange={(event) => setLlmForm((current) => ({ ...current, api_key: event.target.value }))}
+                      placeholder={llmSettings?.configured ? llmSettings.api_key_masked : "sk-..."}
+                    />
+                  </label>
+                  <label>
+                    Temperature
+                    <input
+                      type="number"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      value={llmForm.temperature}
+                      onChange={(event) => setLlmForm((current) => ({ ...current, temperature: Number(event.target.value) }))}
+                    />
+                  </label>
+                  <label className="toggle-row">
+                    <input
+                      type="checkbox"
+                      checked={llmForm.enabled}
+                      onChange={(event) => setLlmForm((current) => ({ ...current, enabled: event.target.checked }))}
+                    />
+                    启用真实模型编排
+                  </label>
+                </div>
+                <div className="button-row">
+                  <button className="primary-button" onClick={saveLlmSettings} disabled={loading}>
+                    <Save size={18} />
+                    保存配置
+                  </button>
+                  <button className="secondary-button fit" onClick={testLlmSettings} disabled={loading}>
+                    <CheckCircle2 size={18} />
+                    测试配置
+                  </button>
+                </div>
+                {llmTestMessage && <p className="context-line">{llmTestMessage}</p>}
+              </div>
+
+              <div className="panel wide">
+                <div className="panel-title">
+                  <h2>平台能力状态</h2>
+                  <Settings size={18} />
+                </div>
+                <div className="settings-status">
+                  <label>LLM Key<span>{llmSettings?.configured ? "已配置" : "未配置"}</span></label>
+                  <label>当前模型<span>{llmSettings ? `${llmSettings.provider} / ${llmSettings.model}` : "--"}</span></label>
+                  <label>后端<span>FastAPI / 本地文件</span></label>
+                  <label>材料解析<span>人工标注结构模拟</span></label>
+                  <label>数据库<span>接口预留</span></label>
+                  <label>对象存储<span>接口预留</span></label>
+                  <label>外部查询<span>离线样例</span></label>
+                  <label>模拟推演<span>模板与运行接口已接入</span></label>
+                </div>
               </div>
             </>
           )}

@@ -11,6 +11,9 @@ from pydantic import BaseModel
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT_DIR / "data" / "workspaces" / "default"
+RUNTIME_DIR = ROOT_DIR / "data" / "runtime"
+LLM_SETTINGS_PATH = RUNTIME_DIR / "llm_settings.json"
+FEEDBACK_PATH = RUNTIME_DIR / "feedback.json"
 
 
 class AgentRunRequest(BaseModel):
@@ -27,6 +30,28 @@ class SimulationRunRequest(BaseModel):
     project_id: str
     template_id: str
     assumptions: List[Dict[str, Any]] = []
+
+
+class LlmSettingsRequest(BaseModel):
+    provider: str = "openai"
+    model: str = "gpt-4.1-mini"
+    base_url: str = "https://api.openai.com/v1"
+    api_key: Optional[str] = None
+    temperature: float = 0.2
+    enabled: bool = False
+
+
+class RuleTestRequest(BaseModel):
+    project_id: str
+    rule_id: str
+
+
+class FeedbackRequest(BaseModel):
+    run_id: str
+    project_id: str
+    rating: str
+    comment: Optional[str] = None
+    save_as_eval_case: bool = False
 
 
 app = FastAPI(
@@ -57,6 +82,19 @@ def read_json(relative_path: str) -> Any:
         return json.load(file)
 
 
+def read_runtime_json(path: Path, default: Any) -> Any:
+    if not path.exists():
+        return default
+    with path.open("r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+def write_runtime_json(path: Path, payload: Any) -> None:
+    RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as file:
+        json.dump(payload, file, ensure_ascii=False, indent=2)
+
+
 def find_by_id(items: List[Dict[str, Any]], item_id: str, key: str = "id") -> Dict[str, Any]:
     for item in items:
         if item.get(key) == item_id:
@@ -64,9 +102,82 @@ def find_by_id(items: List[Dict[str, Any]], item_id: str, key: str = "id") -> Di
     raise HTTPException(status_code=404, detail=f"Item not found: {item_id}")
 
 
+def default_llm_settings() -> Dict[str, Any]:
+    return {
+        "provider": "openai",
+        "model": "gpt-4.1-mini",
+        "base_url": "https://api.openai.com/v1",
+        "api_key": "",
+        "temperature": 0.2,
+        "enabled": False,
+    }
+
+
+def mask_secret(value: Optional[str]) -> str:
+    if not value:
+        return ""
+    if len(value) <= 8:
+        return "********"
+    return f"{value[:4]}...{value[-4:]}"
+
+
+def get_llm_settings_internal() -> Dict[str, Any]:
+    settings = default_llm_settings()
+    settings.update(read_runtime_json(LLM_SETTINGS_PATH, {}))
+    return settings
+
+
+def public_llm_settings(settings: Dict[str, Any]) -> Dict[str, Any]:
+    api_key = settings.get("api_key", "")
+    return {
+        "provider": settings.get("provider", "openai"),
+        "model": settings.get("model", "gpt-4.1-mini"),
+        "base_url": settings.get("base_url", "https://api.openai.com/v1"),
+        "temperature": settings.get("temperature", 0.2),
+        "enabled": bool(settings.get("enabled")),
+        "configured": bool(api_key),
+        "api_key_masked": mask_secret(api_key),
+    }
+
+
 @app.get("/api/health")
 def health() -> Dict[str, str]:
     return {"status": "ok", "storage": "local_files", "version": "0.1.0"}
+
+
+@app.get("/api/settings/llm")
+def get_llm_settings() -> Dict[str, Any]:
+    return public_llm_settings(get_llm_settings_internal())
+
+
+@app.put("/api/settings/llm")
+def save_llm_settings(payload: LlmSettingsRequest) -> Dict[str, Any]:
+    current = get_llm_settings_internal()
+    next_settings = {
+        "provider": payload.provider.strip() or current["provider"],
+        "model": payload.model.strip() or current["model"],
+        "base_url": payload.base_url.strip() or current["base_url"],
+        "api_key": current.get("api_key", ""),
+        "temperature": payload.temperature,
+        "enabled": payload.enabled,
+    }
+    if payload.api_key is not None and payload.api_key.strip():
+        next_settings["api_key"] = payload.api_key.strip()
+    write_runtime_json(LLM_SETTINGS_PATH, next_settings)
+    return public_llm_settings(next_settings)
+
+
+@app.post("/api/settings/llm/test")
+def test_llm_settings() -> Dict[str, Any]:
+    settings = get_llm_settings_internal()
+    configured = bool(settings.get("api_key"))
+    return {
+        "status": "ready" if configured else "missing_key",
+        "provider": settings.get("provider"),
+        "model": settings.get("model"),
+        "base_url": settings.get("base_url"),
+        "message": "LLM Key 已配置，当前处于本地样例测试模式。" if configured else "请先配置 LLM API Key。",
+    }
 
 
 @app.get("/api/projects")
@@ -130,11 +241,18 @@ def create_agent_run(payload: AgentRunRequest) -> Dict[str, Any]:
     scenario = find_by_id(scenarios, payload.task_id)
     rules = [rule for rule in read_json("ontology/rules.json") if rule["scenario_id"] == scenario["id"]]
     documents = list_project_documents(payload.project_id)
+    llm_settings = public_llm_settings(get_llm_settings_internal())
 
     return {
         "run_id": f"run_{payload.project_id}_{payload.task_id}",
         "project_id": payload.project_id,
         "project_name": project["name"],
+        "llm": {
+            "provider": llm_settings["provider"],
+            "model": llm_settings["model"],
+            "configured": llm_settings["configured"],
+            "enabled": llm_settings["enabled"],
+        },
         "matched_scenario": {
             "id": scenario["id"],
             "name": scenario["name"],
@@ -194,9 +312,9 @@ def create_agent_run(payload: AgentRunRequest) -> Dict[str, Any]:
         ],
         "uncertainty": [
             {
-                "issue": "OCR、对象存储、外部实时查询仍为开发中。",
-                "impact": "当前结论只用于离线样例验证。",
-                "required_action": "客户试用前接入真实接口或确认人工标注结果。",
+                "issue": "当前为本地样例运行。",
+                "impact": "可验证本体、规则、证据和评测链路，暂不代表生产结论。",
+                "required_action": "在设置中心配置 LLM Key 后，可切换到真实模型编排。",
             }
         ],
         "conclusion": {
@@ -209,6 +327,47 @@ def create_agent_run(payload: AgentRunRequest) -> Dict[str, Any]:
                 "execution_mode": "human_approval_required",
             }
         ],
+    }
+
+
+@app.post("/api/rules/{rule_id}/test")
+def test_rule(rule_id: str, payload: RuleTestRequest) -> Dict[str, Any]:
+    rule = find_by_id(read_json("ontology/rules.json"), rule_id)
+    project = get_project(payload.project_id)
+    documents = list_project_documents(payload.project_id)
+    return {
+        "rule_id": rule["id"],
+        "rule_name": rule["name"],
+        "project_id": project["id"],
+        "project_name": project["name"],
+        "status": "completed",
+        "result": rule.get("mock_result", "manual_review"),
+        "facts": [
+            {"name": "材料数量", "value": len(documents)},
+            {"name": "项目阶段", "value": project["stage"]},
+            {"name": "规则严重性", "value": rule["severity"]},
+        ],
+        "evidence": [document["name"] for document in documents[:3]],
+    }
+
+
+@app.post("/api/agent/runs/{run_id}/feedback")
+def save_agent_feedback(run_id: str, payload: FeedbackRequest) -> Dict[str, Any]:
+    feedback_items = read_runtime_json(FEEDBACK_PATH, [])
+    item = {
+        "id": f"feedback_{len(feedback_items) + 1}",
+        "run_id": run_id,
+        "project_id": payload.project_id,
+        "rating": payload.rating,
+        "comment": payload.comment or "",
+        "save_as_eval_case": payload.save_as_eval_case,
+    }
+    feedback_items.append(item)
+    write_runtime_json(FEEDBACK_PATH, feedback_items)
+    return {
+        "status": "saved",
+        "feedback": item,
+        "eval_case_created": payload.save_as_eval_case,
     }
 
 
