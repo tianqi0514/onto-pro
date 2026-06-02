@@ -1,0 +1,30 @@
+[
+  {
+    "id": "scenario.material_ontology_draft",
+    "name": "材料归档与本体草案生成",
+    "priority": "P0",
+    "status": "active",
+    "description": "识别材料类型、阶段、项目归属，并生成对象、字段、关系、规则候选。"
+  },
+  {
+    "id": "scenario.leasing_risk_review",
+    "name": "融资租赁尽调与风险审查",
+    "priority": "P0",
+    "status": "active",
+    "description": "围绕承租人、合同、抵押物、材料和关键规则输出风险复核结论。"
+  },
+  {
+    "id": "scenario.contract_consistency",
+    "name": "合同模板审查与跨合同一致性校验",
+    "priority": "P0",
+    "status": "active",
+    "description": "比较审批表、合同、评估报告、通知书之间的关键字段一致性。"
+  },
+  {
+    "id": "scenario.disbursement_check",
+    "name": "放款前置条件与实施管控",
+    "priority": "P0",
+    "status": "active",
+    "description": "检查放款前置条件是否满足，并标记阻断项和人工复核项。"
+  }
+]

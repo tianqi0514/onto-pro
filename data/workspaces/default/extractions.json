@@ -1,0 +1,36 @@
+[
+  {
+    "document_id": "doc_qsl_approval",
+    "input_quality": "manual_annotation",
+    "fields": [
+      {"name": "项目编号", "value": "RZ053", "confidence": 0.98, "evidence": "第1页/项目编号"},
+      {"name": "承租人", "value": "清水绿岸建设有限公司", "confidence": 0.96, "evidence": "第1页/客户名称"},
+      {"name": "融资金额", "value": "10000000", "confidence": 0.93, "evidence": "第2页/融资方案"}
+    ]
+  },
+  {
+    "document_id": "doc_qsl_contract",
+    "input_quality": "manual_annotation",
+    "fields": [
+      {"name": "合同编号", "value": "HT-RZ053-001", "confidence": 0.95, "evidence": "第1页/合同编号"},
+      {"name": "承租人", "value": "清水绿岸建设有限公司", "confidence": 0.94, "evidence": "第1页/甲方"},
+      {"name": "租赁本金", "value": "10000000", "confidence": 0.92, "evidence": "第3页/租赁本金"}
+    ]
+  },
+  {
+    "document_id": "doc_qsl_collateral",
+    "input_quality": "manual_annotation",
+    "fields": [
+      {"name": "抵押物坐落", "value": "清水绿岸一期项目地块", "confidence": 0.82, "evidence": "第4页/估价对象"},
+      {"name": "评估价值", "value": "12500000", "confidence": 0.79, "evidence": "第7页/估价结果"}
+    ]
+  },
+  {
+    "document_id": "doc_gc_invoice",
+    "input_quality": "manual_annotation",
+    "fields": [
+      {"name": "买方", "value": "古城建设集团有限公司", "confidence": 0.91, "evidence": "Sheet1/A列"},
+      {"name": "应收账款金额", "value": "5800000", "confidence": 0.9, "evidence": "Sheet1/F列"}
+    ]
+  }
+]

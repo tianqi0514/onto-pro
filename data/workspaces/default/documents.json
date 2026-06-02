@@ -1,0 +1,42 @@
+[
+  {
+    "id": "doc_qsl_approval",
+    "project_id": "project_qsl_001",
+    "name": "项目审批表-清水绿岸.docx",
+    "type": "审批表",
+    "stage": "审批",
+    "status": "parsed",
+    "confidence": 0.94,
+    "location": "documents/project_qsl_001/项目审批表-清水绿岸.docx"
+  },
+  {
+    "id": "doc_qsl_contract",
+    "project_id": "project_qsl_001",
+    "name": "融资租赁合同-清水绿岸.pdf",
+    "type": "合同",
+    "stage": "签署",
+    "status": "parsed",
+    "confidence": 0.91,
+    "location": "documents/project_qsl_001/融资租赁合同-清水绿岸.pdf"
+  },
+  {
+    "id": "doc_qsl_collateral",
+    "project_id": "project_qsl_001",
+    "name": "抵押物评估报告.pdf",
+    "type": "评估报告",
+    "stage": "担保",
+    "status": "needs_review",
+    "confidence": 0.72,
+    "location": "documents/project_qsl_001/抵押物评估报告.pdf"
+  },
+  {
+    "id": "doc_gc_invoice",
+    "project_id": "project_gc_001",
+    "name": "发票清单-古城建设.xlsx",
+    "type": "票据",
+    "stage": "贸易背景",
+    "status": "parsed",
+    "confidence": 0.9,
+    "location": "documents/project_gc_001/发票清单-古城建设.xlsx"
+  }
+]

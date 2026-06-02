@@ -1,0 +1,12 @@
+node_modules/
+dist/
+build/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+frontend/node_modules/
+frontend/dist/
+frontend/*.tsbuildinfo
+data/runtime/

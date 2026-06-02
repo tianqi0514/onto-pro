@@ -1,0 +1,6 @@
+[
+  {"id": "relation.project_subject", "name": "项目-主体", "status": "approved", "source": "项目", "target": "主体"},
+  {"id": "relation.project_contract", "name": "项目-合同", "status": "approved", "source": "项目", "target": "合同"},
+  {"id": "relation.contract_collateral", "name": "合同-抵押物", "status": "pending_review", "source": "合同", "target": "抵押物"},
+  {"id": "relation.receivable_buyer", "name": "应收账款-买方", "status": "pending_review", "source": "应收账款", "target": "主体"}
+]

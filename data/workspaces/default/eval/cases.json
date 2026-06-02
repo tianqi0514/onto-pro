@@ -1,0 +1,34 @@
+[
+  {
+    "id": "eval.finance.leasing.001",
+    "suite_id": "evalsuite.leasing.p0",
+    "name": "材料类型识别",
+    "priority": "P0",
+    "ontology_depth": "L0",
+    "mock_status": "passed"
+  },
+  {
+    "id": "eval.finance.leasing.002",
+    "suite_id": "evalsuite.leasing.p0",
+    "name": "关键字段抽取",
+    "priority": "P0",
+    "ontology_depth": "L1",
+    "mock_status": "passed"
+  },
+  {
+    "id": "eval.finance.leasing.003",
+    "suite_id": "evalsuite.leasing.p0",
+    "name": "抵押覆盖规则命中",
+    "priority": "P0",
+    "ontology_depth": "L4",
+    "mock_status": "passed"
+  },
+  {
+    "id": "eval.finance.leasing.004",
+    "suite_id": "evalsuite.leasing.p0",
+    "name": "跨文档金额一致性",
+    "priority": "P1",
+    "ontology_depth": "L5",
+    "mock_status": "manual_review"
+  }
+]

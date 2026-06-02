@@ -1,0 +1,38 @@
+[
+  {
+    "id": "project_qsl_001",
+    "code": "RZ053",
+    "name": "清水绿岸融资租赁项目",
+    "type": "融资租赁",
+    "subject": "清水绿岸建设有限公司",
+    "stage": "放款前复核",
+    "material_completion": 0.82,
+    "risk_level": "manual_review",
+    "owner": "内部交付团队",
+    "updated_at": "2026-06-02",
+    "feature_flags": {
+      "database": "development",
+      "object_storage": "development",
+      "ocr": "manual_annotation_mock",
+      "external_query": "offline_sample"
+    }
+  },
+  {
+    "id": "project_gc_001",
+    "code": "BL018",
+    "name": "古城建设保理项目",
+    "type": "保理",
+    "subject": "古城建设集团有限公司",
+    "stage": "贸易背景审查",
+    "material_completion": 0.74,
+    "risk_level": "medium",
+    "owner": "内部交付团队",
+    "updated_at": "2026-06-02",
+    "feature_flags": {
+      "database": "development",
+      "object_storage": "development",
+      "ocr": "manual_annotation_mock",
+      "external_query": "offline_sample"
+    }
+  }
+]

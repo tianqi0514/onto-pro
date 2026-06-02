@@ -1,0 +1,20 @@
+[
+  {
+    "id": "sim_template.collateral_value_down",
+    "name": "抵押物估值下降",
+    "status": "development",
+    "description": "模拟抵押物评估价值下降后对抵押覆盖率和风险等级的影响。",
+    "default_assumptions": [
+      {"name": "抵押物评估价值", "before_value": "12500000", "simulated_value": "10000000", "source": "template"}
+    ],
+    "mock_diff": [
+      {"target": "metric", "name": "抵押覆盖率", "before": "1.25", "after": "1.00", "impact": "increased_risk"}
+    ],
+    "mock_rules_changed": [
+      {"rule_id": "rule.collateral_coverage", "before_result": "hit", "after_result": "manual_review"}
+    ],
+    "mock_impact_paths": [
+      {"path": ["抵押物", "评估价值", "抵押覆盖率", "风险等级"], "description": "估值下降会降低抵押覆盖能力。"}
+    ]
+  }
+]

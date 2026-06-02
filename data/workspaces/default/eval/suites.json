@@ -1,0 +1,9 @@
+[
+  {
+    "id": "evalsuite.leasing.p0",
+    "name": "融资租赁 P0 回归集",
+    "priority": "P0",
+    "case_count": 4,
+    "description": "覆盖 L0-L5 的项目材料、字段、关系、规则和证据基础能力。"
+  }
+]

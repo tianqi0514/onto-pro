@@ -1,0 +1,26 @@
+[
+  {
+    "id": "rule.material_required",
+    "name": "放款材料完整性检查",
+    "scenario_id": "scenario.disbursement_check",
+    "severity": "high",
+    "mock_result": "manual_review",
+    "definition": "放款前必须具备合同、审批、登记、权证和付款条件证明。"
+  },
+  {
+    "id": "rule.collateral_coverage",
+    "name": "抵押覆盖率检查",
+    "scenario_id": "scenario.leasing_risk_review",
+    "severity": "medium",
+    "mock_result": "hit",
+    "definition": "抵押评估价值与融资金额之间必须满足风险控制口径。"
+  },
+  {
+    "id": "rule.contract_amount_consistency",
+    "name": "合同金额一致性检查",
+    "scenario_id": "scenario.contract_consistency",
+    "severity": "high",
+    "mock_result": "hit",
+    "definition": "审批表、合同和放款条件中的金额应保持一致。"
+  }
+]
