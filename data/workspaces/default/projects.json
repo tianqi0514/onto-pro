@@ -11,7 +11,7 @@
     "owner": "内部交付团队",
     "updated_at": "2026-06-02",
     "feature_flags": {
-      "database": "development",
+      "database": "active",
       "object_storage": "development",
       "ocr": "manual_annotation_mock",
       "external_query": "offline_sample"
@@ -29,7 +29,7 @@
     "owner": "内部交付团队",
     "updated_at": "2026-06-02",
     "feature_flags": {
-      "database": "development",
+      "database": "active",
       "object_storage": "development",
       "ocr": "manual_annotation_mock",
       "external_query": "offline_sample"

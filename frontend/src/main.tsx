@@ -1,5 +1,6 @@
-import { StrictMode, useEffect, useMemo, useState } from "react";
+import { StrictMode, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import * as THREE from "three";
 import {
   Activity,
   AlertTriangle,
@@ -7,6 +8,7 @@ import {
   Bot,
   Brain,
   CheckCircle2,
+  CloudUpload,
   FileText,
   GitBranch,
   KeyRound,
@@ -23,6 +25,7 @@ import "./styles.css";
 
 const API_BASE = "";
 const sourceLabels: Record<string, string> = {
+  active: "已接入",
   local_file_mock: "本地文件",
   manual_annotation_mock: "人工标注",
   offline_sample: "离线样例",
@@ -169,6 +172,11 @@ type RuleTestResult = {
   evidence: string[];
 };
 
+type GraphData = {
+  nodes: Array<{ id: string; label: string; type: string; confidence: number; count: number }>;
+  edges: Array<{ source: string; target: string; type: string; confidence: number }>;
+};
+
 type ActiveSection = "projects" | "documents" | "ontology" | "agent" | "eval" | "simulation" | "settings";
 
 async function api<T>(path: string, options?: RequestInit): Promise<T> {
@@ -206,6 +214,136 @@ const navigationItems: Array<{ id: ActiveSection; label: string; icon: typeof La
   { id: "settings", label: "设置", icon: Settings }
 ];
 
+function OntologyGraph3D({ data }: { data: GraphData }) {
+  const mountRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const mount = mountRef.current;
+    if (!mount) return;
+
+    const width = mount.clientWidth || 640;
+    const height = mount.clientHeight || 380;
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color("#0e171d");
+    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 2000);
+    camera.position.set(0, 110, 260);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(width, height);
+    mount.appendChild(renderer.domElement);
+
+    const group = new THREE.Group();
+    scene.add(group);
+    scene.add(new THREE.AmbientLight("#ffffff", 1.1));
+    const point = new THREE.PointLight("#b9f6e4", 1.5, 500);
+    point.position.set(90, 120, 120);
+    scene.add(point);
+
+    const colors: Record<string, string> = {
+      Project: "#14b8a6",
+      Subject: "#38bdf8",
+      Contract: "#f59e0b",
+      Collateral: "#a78bfa",
+      Receivable: "#22c55e",
+      Invoice: "#f97316",
+      Document: "#94a3b8",
+      Rule: "#ef4444",
+      Disbursement: "#eab308",
+    };
+
+    const nodes = data.nodes.slice(0, 90);
+    const positions = new Map<string, THREE.Vector3>();
+    const nodeMaterialCache = new Map<string, THREE.MeshStandardMaterial>();
+    const sphere = new THREE.SphereGeometry(4.6, 24, 24);
+
+    nodes.forEach((node, index) => {
+      const layer = Math.floor(index / 18);
+      const slot = index % 18;
+      const radius = 45 + layer * 34;
+      const angle = (slot / Math.min(18, nodes.length)) * Math.PI * 2 + layer * 0.45;
+      const y = (layer - 2) * 18 + Math.sin(angle * 2) * 12;
+      const position = new THREE.Vector3(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
+      positions.set(node.id, position);
+
+      const color = colors[node.type] ?? "#cbd5e1";
+      let material = nodeMaterialCache.get(color);
+      if (!material) {
+        material = new THREE.MeshStandardMaterial({ color, roughness: 0.42, metalness: 0.18 });
+        nodeMaterialCache.set(color, material);
+      }
+      const mesh = new THREE.Mesh(sphere, material);
+      mesh.position.copy(position);
+      mesh.scale.setScalar(0.85 + Math.min(node.count, 5) * 0.09);
+      group.add(mesh);
+    });
+
+    data.edges.slice(0, 150).forEach((edge) => {
+      const source = positions.get(edge.source);
+      const target = positions.get(edge.target);
+      if (!source || !target) return;
+      const geometry = new THREE.BufferGeometry().setFromPoints([source, target]);
+      const line = new THREE.Line(
+        geometry,
+        new THREE.LineBasicMaterial({
+          color: "#7dd3fc",
+          transparent: true,
+          opacity: 0.24 + Math.min(edge.confidence ?? 0.4, 1) * 0.24,
+        })
+      );
+      group.add(line);
+    });
+
+    let frame = 0;
+    const animate = () => {
+      group.rotation.y += 0.0024;
+      group.rotation.x = Math.sin(Date.now() / 3600) * 0.08;
+      renderer.render(scene, camera);
+      frame = window.requestAnimationFrame(animate);
+    };
+    animate();
+
+    const resizeObserver = new ResizeObserver(([entry]) => {
+      const nextWidth = entry.contentRect.width;
+      const nextHeight = entry.contentRect.height;
+      if (!nextWidth || !nextHeight) return;
+      camera.aspect = nextWidth / nextHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(nextWidth, nextHeight);
+    });
+    resizeObserver.observe(mount);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      resizeObserver.disconnect();
+      mount.removeChild(renderer.domElement);
+      sphere.dispose();
+      nodeMaterialCache.forEach((material) => material.dispose());
+      renderer.dispose();
+    };
+  }, [data]);
+
+  if (!data.nodes.length) {
+    return (
+      <div className="graph-empty">
+        <GitBranch size={22} />
+        <span>导入金融客户资料后生成 3D 本体图谱</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="graph-shell">
+      <div className="graph-canvas" ref={mountRef} />
+      <div className="graph-meta">
+        <span>{data.nodes.length} 对象</span>
+        <span>{data.edges.length} 关系</span>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
@@ -233,10 +371,12 @@ function App() {
   const [extraction, setExtraction] = useState<Extraction | null>(null);
   const [simulationRun, setSimulationRun] = useState<SimulationRun | null>(null);
   const [ruleTestResult, setRuleTestResult] = useState<RuleTestResult | null>(null);
+  const [graphData, setGraphData] = useState<GraphData>({ nodes: [], edges: [] });
   const [feedbackRating, setFeedbackRating] = useState("correct");
   const [feedbackComment, setFeedbackComment] = useState("");
   const [feedbackStatus, setFeedbackStatus] = useState("");
   const [llmTestMessage, setLlmTestMessage] = useState("");
+  const [systemMessage, setSystemMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
   const selectedProject = useMemo(
@@ -294,6 +434,10 @@ function App() {
         setSelectedDocumentId(items[0]?.id ?? null);
       })
       .catch(console.error);
+  }, [selectedProjectId]);
+
+  useEffect(() => {
+    refreshGraph().catch(console.error);
   }, [selectedProjectId]);
 
   useEffect(() => {
@@ -421,6 +565,43 @@ function App() {
     }
   }
 
+  async function refreshGraph() {
+    if (!selectedProjectId) return;
+    const result = await api<GraphData>(`/api/graph?project_id=${encodeURIComponent(selectedProjectId)}`);
+    setGraphData(result);
+  }
+
+  async function initDatabase() {
+    setLoading(true);
+    try {
+      const result = await api<{ status: string; storage: string }>("/api/admin/init-db", { method: "POST" });
+      setSystemMessage(`数据库已初始化：${result.storage}`);
+      window.setTimeout(() => window.location.reload(), 500);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function ingestFinanceDemo() {
+    setLoading(true);
+    try {
+      const result = await api<{ documents: number; failed: number; entities: number; relations: number; logic_rules: number }>(
+        "/api/admin/ingest-finance-demo",
+        { method: "POST" }
+      );
+      setSystemMessage(`已导入 ${result.documents} 份材料，抽取 ${result.entities} 个对象、${result.relations} 条关系、${result.logic_rules} 条规则`);
+      await Promise.all([
+        api<DocumentItem[]>(`/api/projects/${selectedProjectId}/documents`).then((items) => {
+          setDocuments(items);
+          setSelectedDocumentId(items[0]?.id ?? null);
+        }),
+        refreshGraph(),
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <main className="shell">
       <aside className="sidebar">
@@ -542,6 +723,7 @@ function App() {
                 <div className="task-list">
                   <button onClick={() => setActiveSection("documents")}>查看材料抽取</button>
                   <button onClick={() => setActiveSection("agent")}>运行尽调审查</button>
+                  <button onClick={() => setActiveSection("ontology")}>查看 3D 本体图谱</button>
                   <button onClick={() => setActiveSection("eval")}>执行 P0 回归</button>
                 </div>
               </div>
@@ -617,6 +799,22 @@ function App() {
 
           {activeSection === "ontology" && (
             <>
+              <div className="panel graph-panel wide">
+                <div className="panel-title">
+                  <h2>3D 本体图谱</h2>
+                  <GitBranch size={18} />
+                </div>
+                <OntologyGraph3D data={graphData} />
+                <div className="graph-node-list">
+                  {graphData.nodes.slice(0, 8).map((node) => (
+                    <label key={`${node.id}-${node.type}`}>
+                      {node.label}
+                      <span>{node.type} / 出现 {node.count} 次 / {formatPercent(node.confidence ?? 0)}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
               <div className="panel">
                 <div className="panel-title">
                   <h2>对象类型</h2>
@@ -959,13 +1157,24 @@ function App() {
                 <div className="settings-status">
                   <label>LLM Key<span>{llmSettings?.configured ? "已配置" : "未配置"}</span></label>
                   <label>当前模型<span>{llmSettings ? `${llmSettings.provider} / ${llmSettings.model}` : "--"}</span></label>
-                  <label>后端<span>FastAPI / 本地文件</span></label>
+                  <label>后端<span>FastAPI / PostgreSQL</span></label>
                   <label>材料解析<span>人工标注结构模拟</span></label>
-                  <label>数据库<span>接口预留</span></label>
+                  <label>数据库<span>已接入项目、材料、本体、规则、评测</span></label>
                   <label>对象存储<span>接口预留</span></label>
                   <label>外部查询<span>离线样例</span></label>
                   <label>模拟推演<span>模板与运行接口已接入</span></label>
                 </div>
+                <div className="button-row">
+                  <button className="secondary-button fit" onClick={initDatabase} disabled={loading}>
+                    <RefreshCw size={18} />
+                    初始化数据库
+                  </button>
+                  <button className="primary-button" onClick={ingestFinanceDemo} disabled={loading}>
+                    <CloudUpload size={18} />
+                    导入金融客户资料
+                  </button>
+                </div>
+                {systemMessage && <p className="context-line">{systemMessage}</p>}
               </div>
             </>
           )}

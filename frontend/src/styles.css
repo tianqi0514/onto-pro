@@ -228,6 +228,10 @@ h2 {
   grid-column: span 2;
 }
 
+.graph-panel {
+  min-height: 560px;
+}
+
 .panel-title {
   display: flex;
   align-items: center;
@@ -553,6 +557,71 @@ textarea {
   background: #fbfcfd;
 }
 
+.graph-shell {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid #1e2f38;
+  background: #0e171d;
+}
+
+.graph-canvas {
+  width: 100%;
+  height: 390px;
+}
+
+.graph-canvas canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.graph-meta {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.graph-meta span {
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(125, 211, 252, 0.28);
+  border-radius: 8px;
+  padding: 0 10px;
+  color: #d6f5ff;
+  background: rgba(14, 23, 29, 0.72);
+  font-size: 12px;
+}
+
+.graph-empty {
+  min-height: 390px;
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  border: 1px dashed #8aa0ad;
+  border-radius: 8px;
+  background: #111c22;
+  color: #d7e6ee;
+}
+
+.graph-node-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.graph-node-list label {
+  border: 1px solid #e0e7eb;
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: #fbfcfd;
+}
+
 .run-detail p {
   margin: 10px 0 0;
   color: #465760;
@@ -632,5 +701,9 @@ textarea {
 
   .panel.wide {
     grid-column: span 1;
+  }
+
+  .graph-node-list {
+    grid-template-columns: 1fr;
   }
 }

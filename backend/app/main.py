@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import json
+import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+from . import db
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -54,10 +58,20 @@ class FeedbackRequest(BaseModel):
     save_as_eval_case: bool = False
 
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    try:
+        db.seed_base_data()
+    except Exception:
+        pass
+    yield
+
+
 app = FastAPI(
     title="Onto Pro API",
-    version="0.1.0",
+    version="0.2.0",
     description="Local-file first MVP API for ontology-driven financial workflows.",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -124,6 +138,10 @@ def mask_secret(value: Optional[str]) -> str:
 def get_llm_settings_internal() -> Dict[str, Any]:
     settings = default_llm_settings()
     settings.update(read_runtime_json(LLM_SETTINGS_PATH, {}))
+    try:
+        settings = db.get_llm_settings(settings)
+    except Exception:
+        pass
     return settings
 
 
@@ -142,7 +160,28 @@ def public_llm_settings(settings: Dict[str, Any]) -> Dict[str, Any]:
 
 @app.get("/api/health")
 def health() -> Dict[str, str]:
-    return {"status": "ok", "storage": "local_files", "version": "0.1.0"}
+    try:
+        row = db.fetch_one("SELECT 1 AS ok")
+        storage = "postgresql" if row else "unknown"
+    except Exception:
+        storage = "postgresql_unavailable"
+    return {"status": "ok", "storage": storage, "version": "0.2.0"}
+
+
+@app.post("/api/admin/init-db")
+def init_db() -> Dict[str, Any]:
+    db.seed_base_data()
+    return {"status": "ready", "storage": "postgresql"}
+
+
+@app.post("/api/admin/ingest-finance-demo")
+def ingest_finance_demo() -> Dict[str, Any]:
+    return {"status": "completed", **db.ingest_financial_documents()}
+
+
+@app.get("/api/graph")
+def get_graph(project_id: Optional[str] = None) -> Dict[str, Any]:
+    return db.graph_data(project_id)
 
 
 @app.get("/api/settings/llm")
@@ -163,7 +202,10 @@ def save_llm_settings(payload: LlmSettingsRequest) -> Dict[str, Any]:
     }
     if payload.api_key is not None and payload.api_key.strip():
         next_settings["api_key"] = payload.api_key.strip()
-    write_runtime_json(LLM_SETTINGS_PATH, next_settings)
+    try:
+        db.save_llm_settings(next_settings)
+    except Exception:
+        write_runtime_json(LLM_SETTINGS_PATH, next_settings)
     return public_llm_settings(next_settings)
 
 
@@ -182,24 +224,56 @@ def test_llm_settings() -> Dict[str, Any]:
 
 @app.get("/api/projects")
 def list_projects() -> List[Dict[str, Any]]:
-    return read_json("projects.json")
+    return db.fetch_all(
+        """
+        SELECT id, code, name, type, subject, stage, material_completion::float,
+               risk_level, owner, updated_at, feature_flags
+        FROM projects ORDER BY updated_at DESC, id
+        """
+    )
 
 
 @app.get("/api/projects/{project_id}")
 def get_project(project_id: str) -> Dict[str, Any]:
-    return find_by_id(read_json("projects.json"), project_id)
+    project = db.fetch_one(
+        """
+        SELECT id, code, name, type, subject, stage, material_completion::float,
+               risk_level, owner, updated_at, feature_flags
+        FROM projects WHERE id=%s
+        """,
+        (project_id,),
+    )
+    if not project:
+        raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
+    return project
 
 
 @app.get("/api/projects/{project_id}/documents")
 def list_project_documents(project_id: str) -> List[Dict[str, Any]]:
-    documents = read_json("documents.json")
-    return [document for document in documents if document["project_id"] == project_id]
+    return db.fetch_all(
+        """
+        SELECT id, project_id, name, type, stage, status, confidence::float, location, extension, char_count
+        FROM documents WHERE project_id=%s ORDER BY stage, name
+        """,
+        (project_id,),
+    )
 
 
 @app.get("/api/documents/{document_id}/extraction")
 def get_document_extraction(document_id: str) -> Dict[str, Any]:
-    extractions = read_json("extractions.json")
-    return find_by_id(extractions, document_id, "document_id")
+    document = db.fetch_one("SELECT id, content, snippets FROM documents WHERE id=%s", (document_id,))
+    if not document:
+        raise HTTPException(status_code=404, detail=f"Document not found: {document_id}")
+    fields = db.fetch_all(
+        "SELECT name, value, confidence::float, evidence FROM extraction_fields WHERE document_id=%s ORDER BY name",
+        (document_id,),
+    )
+    if not fields:
+        fields = [
+            {"name": "文本长度", "value": str(len(document.get("content") or "")), "confidence": 0.75, "evidence": "解析文本"},
+            {"name": "片段数", "value": str(len(document.get("snippets") or [])), "confidence": 0.75, "evidence": "文档片段"},
+        ]
+    return {"document_id": document_id, "input_quality": "parsed_text", "fields": fields}
 
 
 @app.post("/api/documents/{document_id}/parse")
@@ -216,34 +290,34 @@ def parse_document(document_id: str) -> Dict[str, Any]:
 
 @app.get("/api/ontology/object-types")
 def list_object_types() -> List[Dict[str, Any]]:
-    return read_json("ontology/object_types.json")
+    return db.fetch_all("SELECT * FROM object_types ORDER BY name")
 
 
 @app.get("/api/ontology/relation-types")
 def list_relation_types() -> List[Dict[str, Any]]:
-    return read_json("ontology/relation_types.json")
+    return db.fetch_all("SELECT * FROM relation_types ORDER BY name")
 
 
 @app.get("/api/rules")
 def list_rules() -> List[Dict[str, Any]]:
-    return read_json("ontology/rules.json")
+    return db.fetch_all("SELECT * FROM rules ORDER BY severity DESC, name")
 
 
 @app.get("/api/scenarios")
 def list_scenarios() -> List[Dict[str, Any]]:
-    return read_json("ontology/scenarios.json")
+    return db.fetch_all("SELECT * FROM scenarios ORDER BY priority, name")
 
 
 @app.post("/api/agent/runs")
 def create_agent_run(payload: AgentRunRequest) -> Dict[str, Any]:
     project = get_project(payload.project_id)
-    scenarios = read_json("ontology/scenarios.json")
+    scenarios = db.fetch_all("SELECT * FROM scenarios")
     scenario = find_by_id(scenarios, payload.task_id)
-    rules = [rule for rule in read_json("ontology/rules.json") if rule["scenario_id"] == scenario["id"]]
+    rules = db.fetch_all("SELECT * FROM rules WHERE scenario_id=%s ORDER BY severity DESC", (scenario["id"],))
     documents = list_project_documents(payload.project_id)
     llm_settings = public_llm_settings(get_llm_settings_internal())
 
-    return {
+    result = {
         "run_id": f"run_{payload.project_id}_{payload.task_id}",
         "project_id": payload.project_id,
         "project_name": project["name"],
@@ -328,11 +402,22 @@ def create_agent_run(payload: AgentRunRequest) -> Dict[str, Any]:
             }
         ],
     }
+    db.execute(
+        """
+        INSERT INTO agent_runs (id, project_id, scenario_id, payload)
+        VALUES (%s,%s,%s,%s)
+        ON CONFLICT (id) DO UPDATE SET payload=EXCLUDED.payload, created_at=now()
+        """,
+        (result["run_id"], payload.project_id, payload.task_id, json.dumps(result, ensure_ascii=False)),
+    )
+    return result
 
 
 @app.post("/api/rules/{rule_id}/test")
 def test_rule(rule_id: str, payload: RuleTestRequest) -> Dict[str, Any]:
-    rule = find_by_id(read_json("ontology/rules.json"), rule_id)
+    rule = db.fetch_one("SELECT * FROM rules WHERE id=%s", (rule_id,))
+    if not rule:
+        raise HTTPException(status_code=404, detail=f"Rule not found: {rule_id}")
     project = get_project(payload.project_id)
     documents = list_project_documents(payload.project_id)
     return {
@@ -353,17 +438,21 @@ def test_rule(rule_id: str, payload: RuleTestRequest) -> Dict[str, Any]:
 
 @app.post("/api/agent/runs/{run_id}/feedback")
 def save_agent_feedback(run_id: str, payload: FeedbackRequest) -> Dict[str, Any]:
-    feedback_items = read_runtime_json(FEEDBACK_PATH, [])
     item = {
-        "id": f"feedback_{len(feedback_items) + 1}",
+        "id": f"feedback_{uuid.uuid4().hex}",
         "run_id": run_id,
         "project_id": payload.project_id,
         "rating": payload.rating,
         "comment": payload.comment or "",
         "save_as_eval_case": payload.save_as_eval_case,
     }
-    feedback_items.append(item)
-    write_runtime_json(FEEDBACK_PATH, feedback_items)
+    db.execute(
+        """
+        INSERT INTO feedback_items (id, run_id, project_id, rating, comment, save_as_eval_case)
+        VALUES (%s,%s,%s,%s,%s,%s)
+        """,
+        (item["id"], run_id, payload.project_id, payload.rating, item["comment"], payload.save_as_eval_case),
+    )
     return {
         "status": "saved",
         "feedback": item,
@@ -373,13 +462,15 @@ def save_agent_feedback(run_id: str, payload: FeedbackRequest) -> Dict[str, Any]
 
 @app.get("/api/eval/suites")
 def list_eval_suites() -> List[Dict[str, Any]]:
-    return read_json("eval/suites.json")
+    return db.fetch_all("SELECT * FROM eval_suites ORDER BY priority, name")
 
 
 @app.post("/api/eval/runs")
 def create_eval_run(payload: EvalRunRequest) -> Dict[str, Any]:
-    suite = find_by_id(read_json("eval/suites.json"), payload.suite_id)
-    cases = [case for case in read_json("eval/cases.json") if case["suite_id"] == payload.suite_id]
+    suite = db.fetch_one("SELECT * FROM eval_suites WHERE id=%s", (payload.suite_id,))
+    if not suite:
+        raise HTTPException(status_code=404, detail=f"Eval suite not found: {payload.suite_id}")
+    cases = db.fetch_all("SELECT * FROM eval_cases WHERE suite_id=%s ORDER BY id", (payload.suite_id,))
     passed = sum(1 for case in cases if case["mock_status"] == "passed")
     return {
         "eval_run_id": f"evalrun_{payload.suite_id}",
@@ -400,7 +491,8 @@ def create_eval_run(payload: EvalRunRequest) -> Dict[str, Any]:
 
 @app.get("/api/simulations/templates")
 def list_simulation_templates() -> List[Dict[str, Any]]:
-    return read_json("simulations/templates.json")
+    rows = db.fetch_all("SELECT id, name, status, description, payload FROM simulation_templates ORDER BY name")
+    return [{**row.get("payload", {}), "id": row["id"], "name": row["name"], "status": row["status"], "description": row["description"]} for row in rows]
 
 
 @app.get("/api/projects/{project_id}/simulation-templates")
@@ -409,14 +501,14 @@ def list_project_simulation_templates(project_id: str) -> Dict[str, Any]:
     return {
         "status": "development",
         "message": "模拟推演为 P2 后续模块，当前返回 mock 模板。",
-        "templates": read_json("simulations/templates.json"),
+        "templates": list_simulation_templates(),
     }
 
 
 @app.post("/api/simulations/runs")
 def create_simulation_run(payload: SimulationRunRequest) -> Dict[str, Any]:
     project = get_project(payload.project_id)
-    template = find_by_id(read_json("simulations/templates.json"), payload.template_id)
+    template = find_by_id(list_simulation_templates(), payload.template_id)
     return {
         "simulation_run_id": f"sim_{payload.project_id}_{payload.template_id}",
         "project_id": payload.project_id,

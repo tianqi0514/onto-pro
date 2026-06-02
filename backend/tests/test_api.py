@@ -1,9 +1,18 @@
 from fastapi.testclient import TestClient
+import pytest
 
+from backend.app import db
 from backend.app.main import app
 
 
 client = TestClient(app)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def seed_database():
+    db.seed_base_data()
+    yield
+    db.execute("UPDATE llm_settings SET api_key='', enabled=false WHERE id=%s", ("default",))
 
 
 def test_health():
