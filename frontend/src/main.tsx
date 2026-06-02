@@ -7,7 +7,6 @@ import {
   Bot,
   Brain,
   CheckCircle2,
-  Database,
   FileText,
   GitBranch,
   Layers3,
@@ -21,11 +20,11 @@ import "./styles.css";
 
 const API_BASE = "";
 const sourceLabels: Record<string, string> = {
-  local_file_mock: "本地文件 mock",
-  manual_annotation_mock: "人工标注模拟",
+  local_file_mock: "本地文件",
+  manual_annotation_mock: "人工标注",
   offline_sample: "离线样例",
   development: "开发中",
-  api_mock: "mock API",
+  api_mock: "样例接口",
   frontend: "前端已接入"
 };
 
@@ -132,14 +131,6 @@ function sourceText(value: string) {
   return sourceLabels[value] ?? value;
 }
 
-function SourceNote({ children }: { children: string }) {
-  return <p className="source-note">{children}</p>;
-}
-
-function SourceTag({ children, tone = "mock" }: { children: string; tone?: "mock" | "ready" | "dev" }) {
-  return <span className={`source-tag ${tone}`}>{children}</span>;
-}
-
 function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
@@ -232,19 +223,19 @@ function App() {
           <a><Beaker size={18} />评测</a>
           <a><SlidersHorizontal size={18} />推演</a>
         </nav>
-        <div className="dev-note">
-          <Database size={18} />
-          <span>数据库、对象存储、OCR、外部查询接口开发中</span>
-        </div>
+        <div className="mode-note">本地样例模式</div>
       </aside>
 
       <section className="workspace">
         <header className="topbar">
           <div>
-            <p>内部交付代管 / 本地文件优先 / 后端端口 8001 / 前端端口 5174</p>
+            <p>内部交付代管 / 本地文件优先</p>
             <h1>金融客户样板工作台</h1>
           </div>
           <div className="toolbar">
+            <span className="mode-pill" title="当前数据来自本地样例和 mock API，正式数据库、对象存储和外部查询接口后续接入。">
+              本地样例
+            </span>
             <button className="icon-button" title="刷新" onClick={() => window.location.reload()}>
               <RefreshCw size={18} />
             </button>
@@ -255,40 +246,22 @@ function App() {
           </div>
         </header>
 
-        <section className="runtime-banner">
-          <div>
-            <strong>当前页面为一期开发骨架</strong>
-            <span>已实现：React 工作台、FastAPI mock 接口、本地 JSON 样例、AgentRun/EvalRun/SimulationRun 返回链路。</span>
-          </div>
-          <div className="source-tags">
-            <SourceTag tone="ready">接口已跑通</SourceTag>
-            <SourceTag>本地样例数据</SourceTag>
-            <SourceTag>人工标注模拟 OCR</SourceTag>
-            <SourceTag tone="dev">数据库/对象存储开发中</SourceTag>
-            <SourceTag tone="dev">外部查询开发中</SourceTag>
-          </div>
-        </section>
-
         <section className="summary-grid">
           <div className="metric">
             <span>项目数</span>
             <strong>{projects.length}</strong>
-            <em>mock API</em>
           </div>
           <div className="metric">
             <span>当前材料完成率</span>
             <strong>{selectedProject ? formatPercent(selectedProject.material_completion) : "--"}</strong>
-            <em>本地 JSON</em>
           </div>
           <div className="metric">
             <span>P0 场景</span>
             <strong>{scenarios.filter((scenario) => scenario.priority === "P0").length}</strong>
-            <em>场景 mock</em>
           </div>
           <div className="metric">
             <span>可运行评测集</span>
             <strong>{evalSuites.length}</strong>
-            <em>评测 mock</em>
           </div>
         </section>
 
@@ -298,7 +271,6 @@ function App() {
               <h2>项目列表</h2>
               <Search size={18} />
             </div>
-            <SourceNote>已接入 `/api/projects`；数据来自 `data/workspaces/default/projects.json`。</SourceNote>
             <div className="project-list">
               {projects.map((project) => (
                 <button
@@ -321,7 +293,6 @@ function App() {
               <h2>项目摘要</h2>
               <ShieldCheck size={18} />
             </div>
-            <SourceNote>项目元数据和能力开关来自本地样例；功能状态按 mock/development 明确标记。</SourceNote>
             {selectedProject && (
               <div className="detail-grid">
                 <label>主体<span>{selectedProject.subject}</span></label>
@@ -343,7 +314,6 @@ function App() {
               <h2>材料中心</h2>
               <FileText size={18} />
             </div>
-            <SourceNote>已接入 `/api/projects/:id/documents`；文件未真实上传，当前为本地材料清单 mock。</SourceNote>
             <table>
               <thead>
                 <tr>
@@ -373,7 +343,6 @@ function App() {
               <h2>场景与规则</h2>
               <Activity size={18} />
             </div>
-            <SourceNote>已接入场景和规则 API；规则命中结果为 mock_result，用于验证页面和推理链路。</SourceNote>
             <div className="scenario-list">
               {scenarios.map((scenario) => (
                 <button
@@ -403,15 +372,10 @@ function App() {
               <h2>Agent 运行</h2>
               <Bot size={18} />
             </div>
-            <SourceNote>点击“运行场景”会调用 `/api/agent/runs`；当前返回 mock AgentRun 和证据链。</SourceNote>
             {agentRun ? (
               <div className="run-detail">
-                <div className="source-tags compact">
-                  <SourceTag>mock API 返回</SourceTag>
-                  <SourceTag>本地材料</SourceTag>
-                  <SourceTag tone="dev">外部查询开发中</SourceTag>
-                </div>
                 <strong>{agentRun.matched_scenario.name}</strong>
+                <span className="subtle-meta">样例运行 / {agentRun.matched_scenario.confidence} 置信度</span>
                 <p>{agentRun.conclusion.summary}</p>
                 <div className="skill-list">
                   {agentRun.skills_called.map((skill) => (
@@ -444,19 +408,14 @@ function App() {
               <h2>评测中心</h2>
               <Beaker size={18} />
             </div>
-            <SourceNote>已接入 `/api/eval/runs`；评分和 L0-L7 边界摘要来自本地 EvalCase mock。</SourceNote>
             <button className="secondary-button" onClick={runEval} disabled={loading || !evalSuites.length}>
               <CheckCircle2 size={18} />
               运行 P0 回归
             </button>
             {evalRun && (
               <div className="eval-result">
-                <div className="source-tags compact">
-                  <SourceTag>mock 评分</SourceTag>
-                  <SourceTag>EvalCase 样例</SourceTag>
-                </div>
                 <strong>{formatPercent(evalRun.pass_rate)} 通过</strong>
-                <span>{evalRun.passed}/{evalRun.total} cases</span>
+                <span>{evalRun.passed}/{evalRun.total} cases / 样例评测</span>
                 {evalRun.cases.map((item) => (
                   <div className="rule" key={item.id}>
                     <span>{item.ontology_depth} / {item.name}</span>
@@ -472,7 +431,6 @@ function App() {
               <h2>模拟推演</h2>
               <SlidersHorizontal size={18} />
             </div>
-            <SourceNote>后续 P2 模块；当前只预留模板和 SimulationRun mock 接口，真实推演引擎未实现。</SourceNote>
             <div className="simulation-list">
               {simTemplates.map((template) => (
                 <div className="simulation" key={template.id}>
