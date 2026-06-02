@@ -6,17 +6,19 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from . import db
+from .document_parser import SUPPORTED_EXTENSIONS, parse_document as parse_local_document
 from .llm_ontology import extract_with_config, test_llm_connection
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT_DIR / "data" / "workspaces" / "default"
 RUNTIME_DIR = ROOT_DIR / "data" / "runtime"
+UPLOAD_DIR = ROOT_DIR / "data" / "uploads"
 LLM_SETTINGS_PATH = RUNTIME_DIR / "llm_settings.json"
 FEEDBACK_PATH = RUNTIME_DIR / "feedback.json"
 
@@ -57,6 +59,15 @@ class FeedbackRequest(BaseModel):
     rating: str
     comment: Optional[str] = None
     save_as_eval_case: bool = False
+
+
+class ExtractionAgentConfigRequest(BaseModel):
+    name: str = "金融材料本体抽取 Agent"
+    system_prompt: str
+    extraction_window: int = 8000
+    timeout_seconds: int = 45
+    allow_fallback: bool = True
+    auto_parse_on_upload: bool = False
 
 
 @asynccontextmanager
@@ -178,10 +189,11 @@ def init_db() -> Dict[str, Any]:
 @app.post("/api/admin/ingest-finance-demo")
 def ingest_finance_demo() -> Dict[str, Any]:
     settings = get_llm_settings_internal()
+    agent_config = db.get_extraction_agent_config()
     return {
         "status": "completed",
         **db.ingest_financial_documents(
-            extractor=lambda text, document_name: extract_with_config(text, document_name, settings)
+            extractor=lambda text, document_name: extract_with_config(text, document_name, settings, agent_config)
         ),
     }
 
@@ -237,6 +249,20 @@ def test_llm_settings() -> Dict[str, Any]:
     }
 
 
+@app.get("/api/settings/extraction-agent")
+def get_extraction_agent_config() -> Dict[str, Any]:
+    return db.get_extraction_agent_config()
+
+
+@app.put("/api/settings/extraction-agent")
+def save_extraction_agent_config(payload: ExtractionAgentConfigRequest) -> Dict[str, Any]:
+    if payload.extraction_window < 1000 or payload.extraction_window > 20000:
+        raise HTTPException(status_code=400, detail="extraction_window must be between 1000 and 20000")
+    if payload.timeout_seconds < 10 or payload.timeout_seconds > 120:
+        raise HTTPException(status_code=400, detail="timeout_seconds must be between 10 and 120")
+    return db.save_extraction_agent_config(payload.model_dump())
+
+
 @app.get("/api/projects")
 def list_projects() -> List[Dict[str, Any]]:
     return db.fetch_all(
@@ -275,6 +301,51 @@ def list_project_documents(project_id: str) -> List[Dict[str, Any]]:
     )
 
 
+@app.post("/api/projects/{project_id}/documents/upload")
+async def upload_project_document(project_id: str, file: UploadFile = File(...)) -> Dict[str, Any]:
+    get_project(project_id)
+    filename = Path(file.filename or "uploaded.txt").name
+    extension = Path(filename).suffix.lower()
+    if extension not in SUPPORTED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type: {extension}")
+
+    project_dir = UPLOAD_DIR / project_id
+    project_dir.mkdir(parents=True, exist_ok=True)
+    stored_path = project_dir / f"{uuid.uuid4().hex}_{filename}"
+    stored_path.write_bytes(await file.read())
+
+    try:
+        parsed = parse_local_document(stored_path)
+    except Exception as exc:
+        parsed = {
+            "extension": extension,
+            "char_count": 0,
+            "text": "",
+            "snippets": [f"解析失败：{exc}"],
+        }
+    document = db.create_uploaded_document(project_id, stored_path, parsed, filename)
+    agent_config = db.get_extraction_agent_config()
+    ontology = None
+    if agent_config.get("auto_parse_on_upload"):
+        settings = get_llm_settings_internal()
+        result = extract_with_config(parsed.get("text", ""), filename, settings, agent_config)
+        ontology = db.replace_document_ontology(document["id"], result)
+        document = db.fetch_one(
+            """
+            SELECT id, project_id, name, type, stage, status, confidence::float,
+                   location, extension, char_count, extraction_source, extraction_error
+            FROM documents WHERE id=%s
+            """,
+            (document["id"],),
+        )
+    return {
+        "status": "uploaded",
+        "document": document,
+        "ontology": ontology,
+        "message": "上传成功，已按配置自动解析。" if ontology else "上传成功，可点击重新解析生成本体。",
+    }
+
+
 @app.get("/api/documents/{document_id}/extraction")
 def get_document_extraction(document_id: str) -> Dict[str, Any]:
     document = db.fetch_one("SELECT id, content, snippets FROM documents WHERE id=%s", (document_id,))
@@ -298,7 +369,8 @@ def parse_document(document_id: str) -> Dict[str, Any]:
     if not document:
         raise HTTPException(status_code=404, detail=f"Document not found: {document_id}")
     settings = get_llm_settings_internal()
-    result = extract_with_config(document.get("content") or "", document["name"], settings)
+    agent_config = db.get_extraction_agent_config()
+    result = extract_with_config(document.get("content") or "", document["name"], settings, agent_config)
     stats = db.replace_document_ontology(document_id, result)
     extraction = get_document_extraction(document_id)
     return {

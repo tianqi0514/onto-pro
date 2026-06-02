@@ -66,6 +66,30 @@ def test_llm_settings_roundtrip():
     assert test_response.json()["status"] == "configured"
 
 
+def test_extraction_agent_config_roundtrip():
+    current = client.get("/api/settings/extraction-agent")
+    assert current.status_code == 200
+    payload = current.json()
+    payload["extraction_window"] = 3000
+    payload["timeout_seconds"] = 20
+    payload["allow_fallback"] = True
+    payload["auto_parse_on_upload"] = False
+    response = client.put("/api/settings/extraction-agent", json=payload)
+    assert response.status_code == 200
+    assert response.json()["extraction_window"] == 3000
+
+
+def test_document_upload():
+    response = client.post(
+        "/api/projects/project_qsl_001/documents/upload",
+        files={"file": ("测试材料.txt", b"\xe9\xa1\xb9\xe7\x9b\xae\xe5\x90\x88\xe5\x90\x8c\xe6\x9d\x90\xe6\x96\x99", "text/plain")},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "uploaded"
+    assert payload["document"]["name"] == "测试材料.txt"
+
+
 def test_rule_test():
     response = client.post(
         "/api/rules/rule.collateral_coverage/test",

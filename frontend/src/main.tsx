@@ -30,6 +30,7 @@ const sourceLabels: Record<string, string> = {
   manual_annotation_mock: "人工标注",
   llm: "LLM 生成",
   local_fallback: "本地 fallback",
+  failed: "失败",
   not_started: "未开始",
   offline_sample: "离线样例",
   development: "开发中",
@@ -169,6 +170,15 @@ type LlmForm = {
   api_key: string;
 };
 
+type ExtractionAgentConfig = {
+  name: string;
+  system_prompt: string;
+  extraction_window: number;
+  timeout_seconds: number;
+  allow_fallback: boolean;
+  auto_parse_on_upload: boolean;
+};
+
 type RuleTestResult = {
   rule_id: string;
   rule_name: string;
@@ -201,7 +211,7 @@ function formatPercent(value: number) {
 
 function badgeClass(status: string) {
   if (["active", "parsed", "passed", "completed", "hit", "llm"].includes(status)) return "badge good";
-  if (["development", "needs_review", "manual_review", "local_fallback"].includes(status)) return "badge warn";
+  if (["development", "needs_review", "manual_review", "local_fallback", "failed"].includes(status)) return "badge warn";
   return "badge";
 }
 
@@ -359,6 +369,7 @@ function App() {
   const [objectTypes, setObjectTypes] = useState<ObjectType[]>([]);
   const [relationTypes, setRelationTypes] = useState<RelationType[]>([]);
   const [llmSettings, setLlmSettings] = useState<LlmSettings | null>(null);
+  const [agentConfig, setAgentConfig] = useState<ExtractionAgentConfig | null>(null);
   const [llmForm, setLlmForm] = useState<LlmForm>({
     provider: "openai",
     model: "gpt-4.1-mini",
@@ -382,6 +393,9 @@ function App() {
   const [feedbackStatus, setFeedbackStatus] = useState("");
   const [llmTestMessage, setLlmTestMessage] = useState("");
   const [systemMessage, setSystemMessage] = useState("");
+  const [agentConfigMessage, setAgentConfigMessage] = useState("");
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadStatus, setUploadStatus] = useState("");
   const [loading, setLoading] = useState(false);
 
   const selectedProject = useMemo(
@@ -401,7 +415,7 @@ function App() {
 
   useEffect(() => {
     async function load() {
-      const [projectData, scenarioData, ruleData, suiteData, templateData, objectData, relationData, llmData] = await Promise.all([
+      const [projectData, scenarioData, ruleData, suiteData, templateData, objectData, relationData, llmData, agentData] = await Promise.all([
         api<Project[]>("/api/projects"),
         api<Scenario[]>("/api/scenarios"),
         api<Rule[]>("/api/rules"),
@@ -409,7 +423,8 @@ function App() {
         api<SimulationTemplate[]>("/api/simulations/templates"),
         api<ObjectType[]>("/api/ontology/object-types"),
         api<RelationType[]>("/api/ontology/relation-types"),
-        api<LlmSettings>("/api/settings/llm")
+        api<LlmSettings>("/api/settings/llm"),
+        api<ExtractionAgentConfig>("/api/settings/extraction-agent")
       ]);
       setProjects(projectData);
       setScenarios(scenarioData);
@@ -419,6 +434,7 @@ function App() {
       setObjectTypes(objectData);
       setRelationTypes(relationData);
       setLlmSettings(llmData);
+      setAgentConfig(agentData);
       setLlmForm({
         provider: llmData.provider,
         model: llmData.model,
@@ -568,6 +584,46 @@ function App() {
         method: "POST"
       });
       setLlmTestMessage(result.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveExtractionAgentConfig() {
+    if (!agentConfig) return;
+    setLoading(true);
+    try {
+      const result = await api<ExtractionAgentConfig>("/api/settings/extraction-agent", {
+        method: "PUT",
+        body: JSON.stringify(agentConfig)
+      });
+      setAgentConfig(result);
+      setAgentConfigMessage("材料抽取 Agent 配置已保存");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function uploadMaterial() {
+    if (!uploadFile) return;
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", uploadFile);
+      const response = await fetch(`${API_BASE}/api/projects/${selectedProjectId}/documents/upload`, {
+        method: "POST",
+        body: formData
+      });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      const result = await response.json();
+      setUploadStatus(result.message);
+      setUploadFile(null);
+      const items = await api<DocumentItem[]>(`/api/projects/${selectedProjectId}/documents`);
+      setDocuments(items);
+      setSelectedDocumentId(result.document?.id ?? items[0]?.id ?? null);
+      await refreshGraph();
     } finally {
       setLoading(false);
     }
@@ -785,6 +841,26 @@ function App() {
 
               <div className="panel">
                 <div className="panel-title">
+                  <h2>上传材料</h2>
+                  <CloudUpload size={18} />
+                </div>
+                <div className="upload-box">
+                  <input
+                    type="file"
+                    accept=".md,.txt,.docx,.xlsx,.pdf"
+                    onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
+                  />
+                  <button className="primary-button" onClick={uploadMaterial} disabled={!uploadFile || loading}>
+                    <CloudUpload size={18} />
+                    上传
+                  </button>
+                </div>
+                {uploadFile && <p className="context-line">{uploadFile.name}</p>}
+                {uploadStatus && <p className="context-line">{uploadStatus}</p>}
+              </div>
+
+              <div className="panel">
+                <div className="panel-title">
                   <h2>抽取结果</h2>
                   <FileText size={18} />
                 </div>
@@ -793,7 +869,7 @@ function App() {
                   重新解析
                 </button>
                 {selectedDocument && (
-                  <p className="context-line">{selectedDocument.name}</p>
+                  <p className="context-line">{selectedDocument.name}{selectedDocument.extraction_error ? ` / ${selectedDocument.extraction_error}` : ""}</p>
                 )}
                 {extraction ? (
                   <div className="field-list">
@@ -1106,6 +1182,7 @@ function App() {
                     >
                       <option value="openai">OpenAI</option>
                       <option value="azure_openai">Azure OpenAI</option>
+                      <option value="xiaomi_mimo">Xiaomi Mimo</option>
                       <option value="local">Local / Compatible</option>
                     </select>
                   </label>
@@ -1165,6 +1242,74 @@ function App() {
                   </button>
                 </div>
                 {llmTestMessage && <p className="context-line">{llmTestMessage}</p>}
+              </div>
+
+              <div className="panel wide">
+                <div className="panel-title">
+                  <h2>材料抽取 Agent</h2>
+                  <Bot size={18} />
+                </div>
+                {agentConfig && (
+                  <div className="settings-form agent-config-form">
+                    <label>
+                      Agent 名称
+                      <input
+                        value={agentConfig.name}
+                        onChange={(event) => setAgentConfig((current) => current && ({ ...current, name: event.target.value }))}
+                      />
+                    </label>
+                    <label>
+                      抽取窗口
+                      <input
+                        type="number"
+                        min="1000"
+                        max="20000"
+                        step="500"
+                        value={agentConfig.extraction_window}
+                        onChange={(event) => setAgentConfig((current) => current && ({ ...current, extraction_window: Number(event.target.value) }))}
+                      />
+                    </label>
+                    <label>
+                      超时秒数
+                      <input
+                        type="number"
+                        min="10"
+                        max="120"
+                        step="5"
+                        value={agentConfig.timeout_seconds}
+                        onChange={(event) => setAgentConfig((current) => current && ({ ...current, timeout_seconds: Number(event.target.value) }))}
+                      />
+                    </label>
+                    <label className="toggle-row">
+                      <input
+                        type="checkbox"
+                        checked={agentConfig.allow_fallback}
+                        onChange={(event) => setAgentConfig((current) => current && ({ ...current, allow_fallback: event.target.checked }))}
+                      />
+                      LLM 失败时允许 fallback
+                    </label>
+                    <label className="toggle-row">
+                      <input
+                        type="checkbox"
+                        checked={agentConfig.auto_parse_on_upload}
+                        onChange={(event) => setAgentConfig((current) => current && ({ ...current, auto_parse_on_upload: event.target.checked }))}
+                      />
+                      上传后自动解析
+                    </label>
+                    <label className="prompt-editor">
+                      System Prompt
+                      <textarea
+                        value={agentConfig.system_prompt}
+                        onChange={(event) => setAgentConfig((current) => current && ({ ...current, system_prompt: event.target.value }))}
+                      />
+                    </label>
+                  </div>
+                )}
+                <button className="primary-button spaced" onClick={saveExtractionAgentConfig} disabled={!agentConfig || loading}>
+                  <Save size={18} />
+                  保存 Agent 配置
+                </button>
+                {agentConfigMessage && <p className="context-line">{agentConfigMessage}</p>}
               </div>
 
               <div className="panel wide">

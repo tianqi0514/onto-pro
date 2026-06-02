@@ -210,6 +210,18 @@ def init_schema() -> None:
           enabled BOOLEAN DEFAULT FALSE
         )
         """,
+        """
+        CREATE TABLE IF NOT EXISTS extraction_agent_config (
+          id TEXT PRIMARY KEY DEFAULT 'default',
+          name TEXT,
+          system_prompt TEXT,
+          extraction_window INTEGER,
+          timeout_seconds INTEGER,
+          allow_fallback BOOLEAN DEFAULT TRUE,
+          auto_parse_on_upload BOOLEAN DEFAULT FALSE,
+          updated_at TIMESTAMPTZ DEFAULT now()
+        )
+        """,
     ]
     with connect() as conn, conn.cursor() as cursor:
         for statement in statements:
@@ -372,6 +384,37 @@ def document_content(document_id: str) -> Optional[Dict[str, Any]]:
     )
 
 
+def create_uploaded_document(project_id: str, path: Path, parsed: Dict[str, Any], display_name: Optional[str] = None) -> Dict[str, Any]:
+    document_id = f"upload_{uuid.uuid4().hex}"
+    name = display_name or path.name
+    doc_type = _guess_doc_type(name)
+    execute(
+        """
+        INSERT INTO documents (
+          id, project_id, name, type, stage, status, confidence, location, extension,
+          char_count, content, snippets, extraction_source, extraction_error
+        )
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'not_started','')
+        """,
+        (
+                document_id, project_id, name, doc_type, "用户上传",
+            "parsed" if parsed.get("text") else "needs_review",
+            0.72 if parsed.get("text") else 0.45,
+            str(path), parsed.get("extension"), parsed.get("char_count", 0),
+            parsed.get("text", ""), json.dumps(parsed.get("snippets", []), ensure_ascii=False),
+        ),
+    )
+    row = fetch_one(
+        """
+        SELECT id, project_id, name, type, stage, status, confidence::float,
+               location, extension, char_count, extraction_source, extraction_error
+        FROM documents WHERE id=%s
+        """,
+        (document_id,),
+    )
+    return row or {"id": document_id}
+
+
 def replace_document_ontology(document_id: str, result: Dict[str, Any]) -> Dict[str, Any]:
     execute("DELETE FROM ontology_entities WHERE document_id=%s", (document_id,))
     execute("DELETE FROM ontology_relations WHERE document_id=%s", (document_id,))
@@ -408,7 +451,7 @@ def replace_document_ontology(document_id: str, result: Dict[str, Any]) -> Dict[
         (
             result.get("extraction_source", "llm"),
             result.get("llm_error", ""),
-            0.9 if result.get("extraction_source") == "llm" else 0.76,
+            0.9 if result.get("extraction_source") == "llm" else 0.76 if result.get("extraction_source") == "local_fallback" else 0.3,
             document_id,
         ),
     )
@@ -453,6 +496,80 @@ def save_llm_settings(settings: Dict[str, Any]) -> None:
             bool(settings.get("enabled")),
         ),
     )
+
+
+DEFAULT_AGENT_PROMPT = """你是金融业务本体工程师。请从材料文本中抽取业务本体，输出严格 JSON。
+JSON 字段：
+- entities: 数组。每项包含 name_cn, type, description, properties, confidence。
+- relations: 数组。每项包含 source, target, type, confidence。
+- logic_rules: 数组。每项包含 name_cn, type, formula, linked_entities, confidence。
+- actions: 数组。每项包含 name_cn, linked_logic_names, function_code, confidence。
+实体 type 优先使用：Project, Subject, Contract, Collateral, Receivable, Invoice, Document, Rule, Disbursement。
+关系 type 使用英文大写短语，例如 HAS_DOCUMENT, HAS_PARTY, INVOLVES, GUARANTEES, SECURED_BY。
+不要输出 Markdown，不要输出解释文字。"""
+
+
+def default_extraction_agent_config() -> Dict[str, Any]:
+    return {
+        "id": "default",
+        "name": "金融材料本体抽取 Agent",
+        "system_prompt": DEFAULT_AGENT_PROMPT,
+        "extraction_window": 8000,
+        "timeout_seconds": 45,
+        "allow_fallback": True,
+        "auto_parse_on_upload": False,
+    }
+
+
+def get_extraction_agent_config() -> Dict[str, Any]:
+    init_schema()
+    row = fetch_one(
+        """
+        SELECT id, name, system_prompt, extraction_window, timeout_seconds,
+               allow_fallback, auto_parse_on_upload
+        FROM extraction_agent_config WHERE id=%s
+        """,
+        ("default",),
+    )
+    config = default_extraction_agent_config()
+    if row:
+        config.update({key: value for key, value in row.items() if value is not None})
+    return config
+
+
+def save_extraction_agent_config(config: Dict[str, Any]) -> Dict[str, Any]:
+    current = get_extraction_agent_config()
+    next_config = {
+        **current,
+        "name": config.get("name") or current["name"],
+        "system_prompt": config.get("system_prompt") or current["system_prompt"],
+        "extraction_window": int(config.get("extraction_window") or current["extraction_window"]),
+        "timeout_seconds": int(config.get("timeout_seconds") or current["timeout_seconds"]),
+        "allow_fallback": bool(config.get("allow_fallback")),
+        "auto_parse_on_upload": bool(config.get("auto_parse_on_upload")),
+    }
+    execute(
+        """
+        INSERT INTO extraction_agent_config (
+          id, name, system_prompt, extraction_window, timeout_seconds,
+          allow_fallback, auto_parse_on_upload, updated_at
+        )
+        VALUES ('default', %s, %s, %s, %s, %s, %s, now())
+        ON CONFLICT (id) DO UPDATE SET
+          name=EXCLUDED.name,
+          system_prompt=EXCLUDED.system_prompt,
+          extraction_window=EXCLUDED.extraction_window,
+          timeout_seconds=EXCLUDED.timeout_seconds,
+          allow_fallback=EXCLUDED.allow_fallback,
+          auto_parse_on_upload=EXCLUDED.auto_parse_on_upload,
+          updated_at=now()
+        """,
+        (
+            next_config["name"], next_config["system_prompt"], next_config["extraction_window"],
+            next_config["timeout_seconds"], next_config["allow_fallback"], next_config["auto_parse_on_upload"],
+        ),
+    )
+    return next_config
 
 
 def graph_data(project_id: Optional[str] = None) -> Dict[str, Any]:

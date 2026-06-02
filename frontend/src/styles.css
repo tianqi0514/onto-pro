@@ -557,6 +557,26 @@ textarea {
   background: #fbfcfd;
 }
 
+.upload-box {
+  display: grid;
+  gap: 10px;
+}
+
+.upload-box input {
+  min-height: 42px;
+}
+
+.agent-config-form .prompt-editor {
+  grid-column: 1 / -1;
+}
+
+.agent-config-form textarea {
+  min-height: 220px;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .graph-shell {
   position: relative;
   overflow: hidden;
