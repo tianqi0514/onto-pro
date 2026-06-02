@@ -53,7 +53,7 @@ def test_llm_settings_roundtrip():
             "base_url": "https://api.openai.com/v1",
             "api_key": "sk-test-local",
             "temperature": 0.2,
-            "enabled": True,
+            "enabled": False,
         },
     )
     assert response.status_code == 200
@@ -63,7 +63,7 @@ def test_llm_settings_roundtrip():
 
     test_response = client.post("/api/settings/llm/test")
     assert test_response.status_code == 200
-    assert test_response.json()["status"] == "ready"
+    assert test_response.json()["status"] == "configured"
 
 
 def test_rule_test():

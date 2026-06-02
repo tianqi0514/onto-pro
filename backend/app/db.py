@@ -4,7 +4,7 @@ import json
 import os
 import uuid
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional
 
 import psycopg2
 import psycopg2.extras
@@ -69,7 +69,9 @@ def init_schema() -> None:
           extension TEXT,
           char_count INTEGER DEFAULT 0,
           content TEXT DEFAULT '',
-          snippets JSONB DEFAULT '[]'::jsonb
+          snippets JSONB DEFAULT '[]'::jsonb,
+          extraction_source TEXT DEFAULT 'not_started',
+          extraction_error TEXT DEFAULT ''
         )
         """,
         """
@@ -212,6 +214,8 @@ def init_schema() -> None:
     with connect() as conn, conn.cursor() as cursor:
         for statement in statements:
             cursor.execute(statement)
+        cursor.execute("ALTER TABLE documents ADD COLUMN IF NOT EXISTS extraction_source TEXT DEFAULT 'not_started'")
+        cursor.execute("ALTER TABLE documents ADD COLUMN IF NOT EXISTS extraction_error TEXT DEFAULT ''")
 
 
 def seed_base_data() -> None:
@@ -256,7 +260,9 @@ def seed_base_data() -> None:
         )
 
 
-def ingest_financial_documents() -> Dict[str, Any]:
+def ingest_financial_documents(
+    extractor: Optional[Callable[[str, str], Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
     seed_base_data()
     paths = [
         path for path in FINANCE_DIR.rglob("*")
@@ -267,6 +273,8 @@ def ingest_financial_documents() -> Dict[str, Any]:
     entities = 0
     relations = 0
     logic_rules = 0
+    llm_documents = 0
+    fallback_documents = 0
 
     for path in paths:
         project_id = "project_qsl_001" if "租赁" in str(path) else "project_gc_001"
@@ -283,25 +291,36 @@ def ingest_financial_documents() -> Dict[str, Any]:
         document_id = f"file_{uuid.uuid5(uuid.NAMESPACE_URL, str(path))}"
         doc_type = _guess_doc_type(path.name)
         stage = "租赁" if project_id == "project_qsl_001" else "保理"
-        execute(
-            """
-            INSERT INTO documents (id, project_id, name, type, stage, status, confidence, location, extension, char_count, content, snippets)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            ON CONFLICT (id) DO UPDATE SET
-              type=EXCLUDED.type, stage=EXCLUDED.stage, status=EXCLUDED.status, confidence=EXCLUDED.confidence,
-              location=EXCLUDED.location, extension=EXCLUDED.extension, char_count=EXCLUDED.char_count,
-              content=EXCLUDED.content, snippets=EXCLUDED.snippets
-            """,
-            (
-                document_id, project_id, path.name, doc_type, stage, "parsed" if parsed["text"] else "needs_review",
-                0.88 if parsed["text"] else 0.45, str(path), parsed["extension"], parsed["char_count"],
-                parsed["text"], json.dumps(parsed["snippets"], ensure_ascii=False),
-            ),
-        )
         execute("DELETE FROM ontology_entities WHERE document_id=%s", (document_id,))
         execute("DELETE FROM ontology_relations WHERE document_id=%s", (document_id,))
         execute("DELETE FROM ontology_logic_rules WHERE document_id=%s", (document_id,))
-        result = extract_ontology_from_text(str(parsed["text"]), path.name)
+        result = extractor(str(parsed["text"]), path.name) if extractor else extract_ontology_from_text(str(parsed["text"]), path.name)
+        source = result.get("extraction_source", "local_fallback" if not extractor else "llm")
+        error = result.get("llm_error", "")
+        if source == "llm":
+            llm_documents += 1
+        else:
+            fallback_documents += 1
+        execute(
+            """
+            INSERT INTO documents (
+              id, project_id, name, type, stage, status, confidence, location, extension,
+              char_count, content, snippets, extraction_source, extraction_error
+            )
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            ON CONFLICT (id) DO UPDATE SET
+              type=EXCLUDED.type, stage=EXCLUDED.stage, status=EXCLUDED.status, confidence=EXCLUDED.confidence,
+              location=EXCLUDED.location, extension=EXCLUDED.extension, char_count=EXCLUDED.char_count,
+              content=EXCLUDED.content, snippets=EXCLUDED.snippets,
+              extraction_source=EXCLUDED.extraction_source, extraction_error=EXCLUDED.extraction_error
+            """,
+            (
+                document_id, project_id, path.name, doc_type, stage, "parsed" if parsed["text"] else "needs_review",
+                0.9 if source == "llm" else 0.76 if parsed["text"] else 0.45,
+                str(path), parsed["extension"], parsed["char_count"], parsed["text"],
+                json.dumps(parsed["snippets"], ensure_ascii=False), source, error,
+            ),
+        )
         for entity in result.get("entities", []):
             execute(
                 """
@@ -332,7 +351,74 @@ def ingest_financial_documents() -> Dict[str, Any]:
             logic_rules += 1
         imported += 1
 
-    return {"documents": imported, "failed": failed, "entities": entities, "relations": relations, "logic_rules": logic_rules}
+    return {
+        "documents": imported,
+        "failed": failed,
+        "llm_documents": llm_documents,
+        "fallback_documents": fallback_documents,
+        "entities": entities,
+        "relations": relations,
+        "logic_rules": logic_rules,
+    }
+
+
+def document_content(document_id: str) -> Optional[Dict[str, Any]]:
+    return fetch_one(
+        """
+        SELECT id, name, content, snippets, extraction_source, extraction_error
+        FROM documents WHERE id=%s
+        """,
+        (document_id,),
+    )
+
+
+def replace_document_ontology(document_id: str, result: Dict[str, Any]) -> Dict[str, Any]:
+    execute("DELETE FROM ontology_entities WHERE document_id=%s", (document_id,))
+    execute("DELETE FROM ontology_relations WHERE document_id=%s", (document_id,))
+    execute("DELETE FROM ontology_logic_rules WHERE document_id=%s", (document_id,))
+    for entity in result.get("entities", []):
+        execute(
+            """
+            INSERT INTO ontology_entities (id, document_id, name, type, description, confidence, properties)
+            VALUES (%s,%s,%s,%s,%s,%s,%s)
+            """,
+            (
+                str(uuid.uuid4()), document_id, entity.get("name_cn"), entity.get("type"),
+                entity.get("description"), entity.get("confidence"),
+                json.dumps(entity.get("properties", {}), ensure_ascii=False),
+            ),
+        )
+    for relation in result.get("relations", []):
+        execute(
+            "INSERT INTO ontology_relations (id, document_id, source, target, type, confidence) VALUES (%s,%s,%s,%s,%s,%s)",
+            (str(uuid.uuid4()), document_id, relation.get("source"), relation.get("target"), relation.get("type"), relation.get("confidence")),
+        )
+    for rule in result.get("logic_rules", []):
+        execute(
+            "INSERT INTO ontology_logic_rules (id, document_id, name, formula, linked_entities, confidence) VALUES (%s,%s,%s,%s,%s,%s)",
+            (
+                str(uuid.uuid4()), document_id, rule.get("name_cn"), rule.get("formula"),
+                json.dumps(rule.get("linked_entities", []), ensure_ascii=False), rule.get("confidence"),
+            ),
+        )
+    execute(
+        """
+        UPDATE documents SET extraction_source=%s, extraction_error=%s, confidence=%s WHERE id=%s
+        """,
+        (
+            result.get("extraction_source", "llm"),
+            result.get("llm_error", ""),
+            0.9 if result.get("extraction_source") == "llm" else 0.76,
+            document_id,
+        ),
+    )
+    return {
+        "entities": len(result.get("entities", [])),
+        "relations": len(result.get("relations", [])),
+        "logic_rules": len(result.get("logic_rules", [])),
+        "extraction_source": result.get("extraction_source", "llm"),
+        "llm_error": result.get("llm_error", ""),
+    }
 
 
 def get_llm_settings(defaults: Dict[str, Any]) -> Dict[str, Any]:

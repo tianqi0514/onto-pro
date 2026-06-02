@@ -28,6 +28,9 @@ const sourceLabels: Record<string, string> = {
   active: "已接入",
   local_file_mock: "本地文件",
   manual_annotation_mock: "人工标注",
+  llm: "LLM 生成",
+  local_fallback: "本地 fallback",
+  not_started: "未开始",
   offline_sample: "离线样例",
   development: "开发中",
   api_mock: "样例接口",
@@ -57,6 +60,8 @@ type DocumentItem = {
   status: string;
   confidence: number;
   location: string;
+  extraction_source?: string;
+  extraction_error?: string;
 };
 
 type Scenario = {
@@ -195,8 +200,8 @@ function formatPercent(value: number) {
 }
 
 function badgeClass(status: string) {
-  if (["active", "parsed", "passed", "completed", "hit"].includes(status)) return "badge good";
-  if (["development", "needs_review", "manual_review"].includes(status)) return "badge warn";
+  if (["active", "parsed", "passed", "completed", "hit", "llm"].includes(status)) return "badge good";
+  if (["development", "needs_review", "manual_review", "local_fallback"].includes(status)) return "badge warn";
   return "badge";
 }
 
@@ -518,6 +523,9 @@ function App() {
         method: "POST"
       });
       setExtraction(result.extraction);
+      const items = await api<DocumentItem[]>(`/api/projects/${selectedProjectId}/documents`);
+      setDocuments(items);
+      await refreshGraph();
     } finally {
       setLoading(false);
     }
@@ -585,11 +593,19 @@ function App() {
   async function ingestFinanceDemo() {
     setLoading(true);
     try {
-      const result = await api<{ documents: number; failed: number; entities: number; relations: number; logic_rules: number }>(
+      const result = await api<{
+        documents: number;
+        failed: number;
+        llm_documents: number;
+        fallback_documents: number;
+        entities: number;
+        relations: number;
+        logic_rules: number;
+      }>(
         "/api/admin/ingest-finance-demo",
         { method: "POST" }
       );
-      setSystemMessage(`已导入 ${result.documents} 份材料，抽取 ${result.entities} 个对象、${result.relations} 条关系、${result.logic_rules} 条规则`);
+      setSystemMessage(`已导入 ${result.documents} 份材料，LLM 解析 ${result.llm_documents} 份，fallback ${result.fallback_documents} 份；生成 ${result.entities} 个对象、${result.relations} 条关系、${result.logic_rules} 条规则`);
       await Promise.all([
         api<DocumentItem[]>(`/api/projects/${selectedProjectId}/documents`).then((items) => {
           setDocuments(items);
@@ -627,7 +643,7 @@ function App() {
             );
           })}
         </nav>
-        <div className="mode-note">本地样例模式</div>
+        <div className="mode-note">LLM 本体工作台</div>
       </aside>
 
       <section className="workspace">
@@ -744,6 +760,7 @@ function App() {
                       <th>类型</th>
                       <th>阶段</th>
                       <th>状态</th>
+                      <th>抽取来源</th>
                       <th>置信度</th>
                     </tr>
                   </thead>
@@ -758,6 +775,7 @@ function App() {
                         <td>{document.type}</td>
                         <td>{document.stage}</td>
                         <td><span className={badgeClass(document.status)}>{document.status}</span></td>
+                        <td><span className={badgeClass(document.extraction_source ?? "not_started")}>{sourceText(document.extraction_source ?? "not_started")}</span></td>
                         <td>{formatPercent(document.confidence)}</td>
                       </tr>
                     ))}
@@ -1158,7 +1176,7 @@ function App() {
                   <label>LLM Key<span>{llmSettings?.configured ? "已配置" : "未配置"}</span></label>
                   <label>当前模型<span>{llmSettings ? `${llmSettings.provider} / ${llmSettings.model}` : "--"}</span></label>
                   <label>后端<span>FastAPI / PostgreSQL</span></label>
-                  <label>材料解析<span>人工标注结构模拟</span></label>
+                  <label>材料解析<span>LLM 生成，本地 fallback 保底</span></label>
                   <label>数据库<span>已接入项目、材料、本体、规则、评测</span></label>
                   <label>对象存储<span>接口预留</span></label>
                   <label>外部查询<span>离线样例</span></label>

@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from . import db
+from .llm_ontology import extract_with_config, test_llm_connection
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -176,7 +177,13 @@ def init_db() -> Dict[str, Any]:
 
 @app.post("/api/admin/ingest-finance-demo")
 def ingest_finance_demo() -> Dict[str, Any]:
-    return {"status": "completed", **db.ingest_financial_documents()}
+    settings = get_llm_settings_internal()
+    return {
+        "status": "completed",
+        **db.ingest_financial_documents(
+            extractor=lambda text, document_name: extract_with_config(text, document_name, settings)
+        ),
+    }
 
 
 @app.get("/api/graph")
@@ -213,12 +220,20 @@ def save_llm_settings(payload: LlmSettingsRequest) -> Dict[str, Any]:
 def test_llm_settings() -> Dict[str, Any]:
     settings = get_llm_settings_internal()
     configured = bool(settings.get("api_key"))
+    if configured and settings.get("enabled"):
+        result = test_llm_connection(settings)
+        return {
+            **result,
+            "provider": settings.get("provider"),
+            "model": settings.get("model"),
+            "base_url": settings.get("base_url"),
+        }
     return {
-        "status": "ready" if configured else "missing_key",
+        "status": "configured" if configured else "missing_key",
         "provider": settings.get("provider"),
         "model": settings.get("model"),
         "base_url": settings.get("base_url"),
-        "message": "LLM Key 已配置，当前处于本地样例测试模式。" if configured else "请先配置 LLM API Key。",
+        "message": "LLM Key 已保存。启用真实模型编排后会发起实际连通性测试。" if configured else "请先配置 LLM API Key。",
     }
 
 
@@ -252,7 +267,8 @@ def get_project(project_id: str) -> Dict[str, Any]:
 def list_project_documents(project_id: str) -> List[Dict[str, Any]]:
     return db.fetch_all(
         """
-        SELECT id, project_id, name, type, stage, status, confidence::float, location, extension, char_count
+        SELECT id, project_id, name, type, stage, status, confidence::float,
+               location, extension, char_count, extraction_source, extraction_error
         FROM documents WHERE project_id=%s ORDER BY stage, name
         """,
         (project_id,),
@@ -278,12 +294,19 @@ def get_document_extraction(document_id: str) -> Dict[str, Any]:
 
 @app.post("/api/documents/{document_id}/parse")
 def parse_document(document_id: str) -> Dict[str, Any]:
+    document = db.document_content(document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail=f"Document not found: {document_id}")
+    settings = get_llm_settings_internal()
+    result = extract_with_config(document.get("content") or "", document["name"], settings)
+    stats = db.replace_document_ontology(document_id, result)
     extraction = get_document_extraction(document_id)
     return {
         "document_id": document_id,
         "status": "completed",
-        "parser": "manual_annotation_mock",
-        "message": "OCR 自动识别开发中，当前使用人工标注结构模拟。",
+        "parser": stats["extraction_source"],
+        "message": "已通过项目内 LLM 配置解析生成本体。" if stats["extraction_source"] == "llm" else "LLM 未启用或调用失败，已使用本地 fallback；OCR 仍不实现。",
+        "ontology": stats,
         "extraction": extraction,
     }
 
@@ -334,7 +357,7 @@ def create_agent_run(payload: AgentRunRequest) -> Dict[str, Any]:
         },
         "facts_used": [
             {
-                "fact": "项目材料、人工标注抽取结果与离线 mock 数据已加载。",
+                "fact": "项目材料、LLM/本地 fallback 抽取结果与离线样例已加载。",
                 "source_type": "document",
                 "source_ref": f"{len(documents)} documents",
             }
@@ -368,7 +391,7 @@ def create_agent_run(payload: AgentRunRequest) -> Dict[str, Any]:
             {
                 "step": 2,
                 "type": "skill_call",
-                "description": "读取本地材料、人工标注结构和离线样例。",
+                "description": "读取本地材料、LLM 生成的本体关系和离线样例。",
             },
             {
                 "step": 3,
